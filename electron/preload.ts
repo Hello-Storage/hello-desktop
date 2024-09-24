@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electron', {
   // You can expose other APTs you need here.
   // ...
   getAvailableStorage: async () => ipcRenderer.invoke('get-available-storage'),
+  setOfferedStorage: async (storage: number) => ipcRenderer.invoke('set-offered-storage', storage),
   onAlertTitle: (callback: (title: string) => void) => {
     ipcRenderer.on('alert-title', (_, title) => callback(title));
   },

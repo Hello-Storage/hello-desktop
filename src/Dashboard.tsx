@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { openDB } from 'idb';
 import useIndexedDB from './idb/useIndexedDb';
-import UploadButton from './components/UploadButton';
-import DownloadButton from './components/DownloadButton';
+import StorageDragBar from './components/storage/StorageDragBar';
+//import UploadButton from './components/UploadButton';
+//import DownloadButton from './components/DownloadButton';
 
 
 
@@ -11,6 +11,7 @@ declare global {
     interface Window {
         electron: {
             getAvailableStorage: () => Promise<number>;
+            setOfferedStorage: (storage: number) => Promise<boolean>;
         };
     }
 }
@@ -20,14 +21,15 @@ declare global {
 const Dashboard: React.FC = () => {
     const db = useIndexedDB();
 
-    const backendUrl = "http://localhost:8181/api"
 
 
 
     const [isMining, setIsMining] = useState<boolean>(false);
     const [currentBalance, setCurrentBalance] = useState<number>(0);
-    const [bandwidth, setBandwidth] = useState<number>(0);
-    const [maxBandwidth, setMaxBandwidth] = useState<number>(100); // Default to 100 GB
+    const [storage, setStorage] = useState<number>(0);
+    const [maxStorage, setMaxStorage] = useState<number>(100); // Default to 100 GB
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [loadingMessage, setLoadingMessage] = useState<string>('');
 
 
     // Load data from IndexedDB when the database is ready
@@ -35,20 +37,23 @@ const Dashboard: React.FC = () => {
         if (!db) return;
 
         const loadData = async () => {
+            setIsLoading(true)
             const savedBalance = await db.get('settings', 'currentBalance');
-            const savedBandwidth = await db.get('settings', 'bandwidth');
+            const savedStorage = await db.get('settings', 'storage');
             const savedIsMining = await db.get('settings', 'isMining');
 
             if (savedBalance !== undefined) {
                 setCurrentBalance(savedBalance);
             }
-            if (savedBandwidth !== undefined) {
-                setBandwidth(savedBandwidth);
+            if (savedStorage !== undefined) {
+                setStorage(savedStorage);
             }
 
             if (savedIsMining !== undefined) {
                 setIsMining(savedIsMining);
             }
+
+            setIsLoading(false);
         };
 
         loadData();
@@ -57,20 +62,20 @@ const Dashboard: React.FC = () => {
     // Save currentBalance to IndexedDB whenever it changes
 
     useEffect(() => {
-        if (!db || currentBalance <= 0) return;
+        if (!db || currentBalance <= 0 || isLoading) return;
         db.put('settings', currentBalance, 'currentBalance');
     }, [currentBalance, db]);
 
 
-    // Save bandwidth to IndexedDB whenever it changes
+    // Save storage to IndexedDB whenever it changes
     useEffect(() => {
-        if (!db || bandwidth <= 0 || bandwidth > maxBandwidth) return;
-        db.put('settings', bandwidth, 'bandwidth');
-    }, [bandwidth, db]);
+        if (!db || storage <= 0 || storage > maxStorage || isLoading) return;
+        db.put('settings', storage, 'storage');
+    }, [storage, db]);
 
     // Save isMining to IndexedDB whenever it changes
     useEffect(() => {
-        if (!db || !isMining) return;
+        if (!db || isLoading) return;
         db.put('settings', isMining, 'isMining');
     }, [isMining, db]);
 
@@ -79,7 +84,7 @@ const Dashboard: React.FC = () => {
         let miningInterval: NodeJS.Timeout | undefined;
         if (isMining) {
             miningInterval = setInterval(() => {
-                setCurrentBalance((prevBalance) => prevBalance + 0.00001);
+                setCurrentBalance((prevBalance) => prevBalance + 0.0000000001);
             }, 1000); // Increment balance every second
         } else {
             clearInterval(miningInterval);
@@ -92,15 +97,8 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         // Fetch available storage on component mount
         const fetchAvailableStorage = async () => {
-            /*
-            (window as any).ipcRenderer.onAlertTitle((title: string) => {
-                alert(title); // Show an alert with the title
-            });
-            */
             const availableStorage = await window.electron.getAvailableStorage();
-            //console.log("res", res)
-            //const availableStorage = await window.electron.getAvailableStorage();
-            setMaxBandwidth(Math.floor(availableStorage * 0.9)); // Set max bandwidth to available storage (in GB)
+            setMaxStorage(Math.floor(availableStorage * 0.9)); // Set max storage to available storage (in GB)
         };
 
         fetchAvailableStorage();
@@ -110,17 +108,43 @@ const Dashboard: React.FC = () => {
         setIsMining(!isMining); // Toggle mining state
     };
 
-    const handleBandwidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setBandwidth(Number(e.target.value)); // Update bandwidth state
+    const handleStorageChange = async (b: number) => {
+        if (b < 0 || b > maxStorage) return;
+
+
+        // Set offered storage in the main process
+
+        setIsLoading(true);
+        setLoadingMessage('Setting offered storage...');
+        const result = await window.electron.setOfferedStorage(b);
+        if (result) {
+            if (b === 0) {
+                setLoadingMessage('Offered storage removed successfully');
+            } else {
+                setLoadingMessage('Offered storage set successfully');
+            }
+            setStorage(b); // Update storage state
+            //sleep for 2 seconds
+            await new Promise(r => setTimeout(r, 2000));
+        }
+        setLoadingMessage('');
+        setIsLoading(false);
+
     };
 
 
     return (
         <div className="flex flex-col items-center p-6 space-y-4" >
-        
+
             {/* First Row: Upload Data Button */}
+            {/*
             <UploadButton />
             <DownloadButton />
+            */}
+            {/*Add a loadingMessage view with nice tailwindcss design and progress spinner*/}
+            <div className="w-full flex justify-center items-center" >
+                {isLoading && <p className="text-lg font-semibold" > {loadingMessage} </p>}
+            </div>
 
             {/* Second Row: Start/Stop Mining Button */}
             <div className="w-full flex justify-center">
@@ -129,6 +153,7 @@ const Dashboard: React.FC = () => {
                     className={`${isMining ? 'bg-red-500' : 'bg-green-500'
                         } text-white px-4 py-2 rounded hover:${isMining ? 'bg-red-600' : 'bg-green-600'}`
                     }
+                    disabled={isLoading} // Disable the button while loading data
                 >
                     {isMining ? 'STOP MINING' : 'START MINING'}
                 </button>
@@ -136,54 +161,14 @@ const Dashboard: React.FC = () => {
 
             {/* Current Balance Row */}
             <div className="w-full flex justify-center items-center" >
-                <p className="text-lg font-semibold" > Current Balance: {currentBalance.toFixed(5)} HELLO </p>
+                <p className="text-lg font-semibold" > Current Balance: {currentBalance.toFixed(10)} HELLO </p>
             </div>
 
-            {/* Bandwidth Drag Bar */}
-            <div className="w-full flex flex-col items-center" >
-                <label htmlFor="bandwidth" className="mb-2 text-sm font-medium" >
-                    Offered Bandwidth: {bandwidth} GB
-                </label>
-                <input
-                    id="bandwidth"
-                    type="range"
-                    min="0"
-                    max={maxBandwidth}
-                    value={bandwidth}
-                    onChange={handleBandwidthChange}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-slider"
-                />
+            {/* storage Drag Bar */}
+            <div className="w-full flex flex-row items-center" >
+                <StorageDragBar storage={storage} maxStorage={maxStorage} handleStorageChange={handleStorageChange} />
             </div>
 
-            {/* Custom styles for the range slider */}
-            <style>{`
-        input[type='range'].range-slider {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 100%;
-          height: 8px;
-          background: linear-gradient(to right, #3b82f6 ${(bandwidth * 100) / maxBandwidth}%, #e5e7eb ${(bandwidth * 100) / maxBandwidth}%);
-          border-radius: 5px;
-          outline: none;
-          transition: background 0.3s ease;
-        }
-        input[type='range'].range-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          background: #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-        input[type='range'].range-slider::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          background: #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-      `}</style>
         </div>
     );
 };

@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import os from 'node:os';
+import { promises as fsPromises } from 'node:fs';
+
 
 import { checkSync } from 'diskusage';
 import axios from 'axios';
@@ -47,6 +50,104 @@ async function getAvailableStorage(): Promise<number> {
   }
 }
 
+// Function to set offered storage with that creates a binary file with the size of the storage
+async function setOfferedStorage(storage: number): Promise<boolean> {
+  try {
+    const homePath = app.getPath('home'); // Use home directory path
+    const helloAppPath = path.join(homePath, 'hello-app');
+    const filePath = path.join(helloAppPath, 'offered-storage.bin');
+
+    // If the storage is 0, remove the allocated offered storage
+    if (storage === 0) {
+      try {
+        await fsPromises.access(filePath);
+        await fsPromises.unlink(filePath);
+        console.log('Allocated storage removed sucessfully');
+      } catch (err: any) {
+        if (err.code !== 'ENOENT') {
+          throw err;
+        }
+        console.log('No allocated storage to remove');
+      }
+      return true;
+    }
+
+    const size = storage * (1024 ** 3); // Convert GB to bytes
+    console.log(`Allocating ${storage} GB of storage...`);
+
+    await fsPromises.mkdir(helloAppPath, { recursive: true });
+
+    const { free } = checkSync(homePath);
+    if (free < size) {
+      console.error('Not enough free space to allocate storage');
+      return false;
+    }
+
+    // Determine optimal chunk size based on system memory
+    const totalMemory = os.totalmem();
+    const availableMemory = Math.max(os.freemem() - (0.2 * totalMemory), 0); // Reserve 20% of memory for system use
+
+    let chunkSize = 256 * (1024 ** 2); // Default 256 MB chunk size
+    if (availableMemory < chunkSize) {
+      chunkSize = Math.floor(availableMemory / 2); // Use half of available memory if less than default chunk size
+    }
+
+    console.log(`Using chunk size of ${chunkSize / (1024 ** 2)} MB`);
+
+
+    // Check if the file exists and delete it if it does
+    try {
+      await fsPromises.access(filePath);
+      await fsPromises.unlink(filePath);
+    } catch (err: any) {
+      // If the error is not "file not found", rethrow it
+      if (err.code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
+    // Write the file in chunks to prevent memory overflow
+    const writeStream = require('fs').createWriteStream(filePath, { flags: 'w' });
+    let bytesWritten = 0;
+
+    while (bytesWritten < size) {
+      // Determine the size of the next chunk to write
+      const remainingBytes = size - bytesWritten;
+      const currentChunkSize = Math.min(chunkSize, remainingBytes);
+
+      // Create a buffer of the current chunk size
+      const buffer = Buffer.alloc(currentChunkSize);
+
+      // Write the buffer to the file
+      await new Promise((res, rej) => {
+        writeStream.write(buffer, (err: any) => {
+          if (err) rej(err);
+          else res(true);
+        })
+      });
+
+      // Increment the total bytes written
+      bytesWritten += currentChunkSize;
+    }
+
+    // Close the write stream
+    await new Promise((res, rej) => {
+      writeStream.end((err: any) => {
+        if (err) rej(err);
+        else res(true);
+      });
+    })
+
+
+
+    console.log('Storage allocated successfully');
+    return true;
+  } catch (error) {
+    console.error(`Failed to set offered storage ${storage}:`, error);
+    return false;
+  }
+}
+
 ipcMain.handle('fetch-data', async () => {
   try {
     const response = await axios.get('https://google.com');
@@ -83,6 +184,11 @@ function createWindow() {
   ipcMain.handle('get-available-storage', async () => {
     return getAvailableStorage();
   });
+
+  ipcMain.handle('set-offered-storage', async (_, storage: number) => {
+    return setOfferedStorage(storage);
+  });
+
 
   // Emit the event with the string after 5 seconds (as an example)
   setTimeout(() => {

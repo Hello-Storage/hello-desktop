@@ -2,6 +2,8 @@ import { ipcMain, app, BrowserWindow } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
+import os from "node:os";
+import { promises } from "node:fs";
 import { checkSync } from "diskusage";
 import require$$1, { TextEncoder as TextEncoder$1 } from "util";
 import stream, { Readable } from "stream";
@@ -13253,7 +13255,7 @@ var hasRequiredSupportsColor;
 function requireSupportsColor() {
   if (hasRequiredSupportsColor) return supportsColor_1;
   hasRequiredSupportsColor = 1;
-  const os = require$$0$2;
+  const os2 = require$$0$2;
   const tty = require$$1$2;
   const hasFlag2 = requireHasFlag();
   const { env } = process;
@@ -13301,7 +13303,7 @@ function requireSupportsColor() {
       return min;
     }
     if (process.platform === "win32") {
-      const osRelease = os.release().split(".");
+      const osRelease = os2.release().split(".");
       if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
         return Number(osRelease[2]) >= 14931 ? 3 : 2;
       }
@@ -15975,8 +15977,8 @@ axios.VERSION = VERSION;
 axios.toFormData = toFormData;
 axios.AxiosError = AxiosError;
 axios.Cancel = axios.CanceledError;
-axios.all = function all(promises) {
-  return Promise.all(promises);
+axios.all = function all(promises2) {
+  return Promise.all(promises2);
 };
 axios.spread = spread;
 axios.isAxiosError = isAxiosError;
@@ -15986,7 +15988,7 @@ axios.formToJSON = (thing) => formDataToJSON(utils$1.isHTMLForm(thing) ? new For
 axios.getAdapter = adapters.getAdapter;
 axios.HttpStatusCode = HttpStatusCode;
 axios.default = axios;
-createRequire(import.meta.url);
+const require2 = createRequire(import.meta.url);
 const __dirname = path$1.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
@@ -16002,6 +16004,74 @@ async function getAvailableStorage() {
   } catch (error) {
     console.error("Failed to get disk usage:", error);
     return 0;
+  }
+}
+async function setOfferedStorage(storage) {
+  try {
+    const homePath = app.getPath("home");
+    const helloAppPath = path$1.join(homePath, "hello-app");
+    const filePath = path$1.join(helloAppPath, "offered-storage.bin");
+    if (storage === 0) {
+      try {
+        await promises.access(filePath);
+        await promises.unlink(filePath);
+        console.log("Allocated storage removed sucessfully");
+      } catch (err) {
+        if (err.code !== "ENOENT") {
+          throw err;
+        }
+        console.log("No allocated storage to remove");
+      }
+      return true;
+    }
+    const size = storage * 1024 ** 3;
+    console.log(`Allocating ${storage} GB of storage...`);
+    await promises.mkdir(helloAppPath, { recursive: true });
+    const { free } = checkSync(homePath);
+    if (free < size) {
+      console.error("Not enough free space to allocate storage");
+      return false;
+    }
+    const totalMemory = os.totalmem();
+    const availableMemory = Math.max(os.freemem() - 0.2 * totalMemory, 0);
+    let chunkSize = 256 * 1024 ** 2;
+    if (availableMemory < chunkSize) {
+      chunkSize = Math.floor(availableMemory / 2);
+    }
+    console.log(`Using chunk size of ${chunkSize / 1024 ** 2} MB`);
+    try {
+      await promises.access(filePath);
+      await promises.unlink(filePath);
+    } catch (err) {
+      if (err.code !== "ENOENT") {
+        throw err;
+      }
+    }
+    const writeStream = require2("fs").createWriteStream(filePath, { flags: "w" });
+    let bytesWritten = 0;
+    while (bytesWritten < size) {
+      const remainingBytes = size - bytesWritten;
+      const currentChunkSize = Math.min(chunkSize, remainingBytes);
+      const buffer = Buffer.alloc(currentChunkSize);
+      await new Promise((res, rej) => {
+        writeStream.write(buffer, (err) => {
+          if (err) rej(err);
+          else res(true);
+        });
+      });
+      bytesWritten += currentChunkSize;
+    }
+    await new Promise((res, rej) => {
+      writeStream.end((err) => {
+        if (err) rej(err);
+        else res(true);
+      });
+    });
+    console.log("Storage allocated successfully");
+    return true;
+  } catch (error) {
+    console.error(`Failed to set offered storage ${storage}:`, error);
+    return false;
   }
 }
 ipcMain.handle("fetch-data", async () => {
@@ -16032,6 +16102,9 @@ function createWindow() {
   }
   ipcMain.handle("get-available-storage", async () => {
     return getAvailableStorage();
+  });
+  ipcMain.handle("set-offered-storage", async (_, storage) => {
+    return setOfferedStorage(storage);
   });
   setTimeout(() => {
     win == null ? void 0 : win.webContents.send("alert-title", "Hello from Main Process!");

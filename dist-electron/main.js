@@ -1,4 +1,4 @@
-import { ipcMain, app, BrowserWindow } from "electron";
+import { ipcMain, app, BrowserWindow, shell } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
@@ -16036,6 +16036,7 @@ async function setOfferedStorage(storage) {
     const availableMemory = Math.max(os.freemem() - 0.2 * totalMemory, 0);
     let chunkSize = 256 * 1024 ** 2;
     if (availableMemory < chunkSize) {
+      console.log("Not enough memory to allocate storage in chunks");
       chunkSize = Math.floor(availableMemory / 2);
     }
     console.log(`Using chunk size of ${chunkSize / 1024 ** 2} MB`);
@@ -16047,19 +16048,16 @@ async function setOfferedStorage(storage) {
         throw err;
       }
     }
+    const buffer = Buffer.alloc(chunkSize);
     const writeStream = require2("fs").createWriteStream(filePath, { flags: "w" });
-    let bytesWritten = 0;
-    while (bytesWritten < size) {
-      const remainingBytes = size - bytesWritten;
-      const currentChunkSize = Math.min(chunkSize, remainingBytes);
-      const buffer = Buffer.alloc(currentChunkSize);
+    for (let bytesWritten = 0; bytesWritten < size; bytesWritten += chunkSize) {
+      const bytesToWrite = Math.min(chunkSize, size - bytesWritten);
       await new Promise((res, rej) => {
-        writeStream.write(buffer, (err) => {
+        writeStream.write(buffer.subarray(0, bytesToWrite), (err) => {
           if (err) rej(err);
           else res(true);
         });
       });
-      bytesWritten += currentChunkSize;
     }
     await new Promise((res, rej) => {
       writeStream.end((err) => {
@@ -16073,6 +16071,17 @@ async function setOfferedStorage(storage) {
     console.error(`Failed to set offered storage ${storage}:`, error);
     return false;
   }
+}
+function openOfferedStorage() {
+  const homePath = app.getPath("home");
+  const helloAppPath = path$1.join(homePath, "hello-app");
+  shell.openPath(helloAppPath).then((res) => {
+    if (res) {
+      console.error("Failed to open storage directory:", res);
+    } else {
+      console.log(`Storage directory at ${helloAppPath} opened successfully`);
+    }
+  });
 }
 ipcMain.handle("fetch-data", async () => {
   try {
@@ -16105,6 +16114,9 @@ function createWindow() {
   });
   ipcMain.handle("set-offered-storage", async (_, storage) => {
     return setOfferedStorage(storage);
+  });
+  ipcMain.handle("open-offered-storage", async () => {
+    openOfferedStorage();
   });
   setTimeout(() => {
     win == null ? void 0 : win.webContents.send("alert-title", "Hello from Main Process!");

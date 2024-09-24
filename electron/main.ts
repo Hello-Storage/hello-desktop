@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -89,6 +89,7 @@ async function setOfferedStorage(storage: number): Promise<boolean> {
 
     let chunkSize = 256 * (1024 ** 2); // Default 256 MB chunk size
     if (availableMemory < chunkSize) {
+      console.log('Not enough memory to allocate storage in chunks');
       chunkSize = Math.floor(availableMemory / 2); // Use half of available memory if less than default chunk size
     }
 
@@ -107,27 +108,16 @@ async function setOfferedStorage(storage: number): Promise<boolean> {
     }
 
     // Write the file in chunks to prevent memory overflow
+    const buffer = Buffer.alloc(chunkSize);
     const writeStream = require('fs').createWriteStream(filePath, { flags: 'w' });
-    let bytesWritten = 0;
-
-    while (bytesWritten < size) {
-      // Determine the size of the next chunk to write
-      const remainingBytes = size - bytesWritten;
-      const currentChunkSize = Math.min(chunkSize, remainingBytes);
-
-      // Create a buffer of the current chunk size
-      const buffer = Buffer.alloc(currentChunkSize);
-
-      // Write the buffer to the file
+    for (let bytesWritten = 0; bytesWritten < size; bytesWritten += chunkSize) {
+      const bytesToWrite = Math.min(chunkSize, size - bytesWritten);
       await new Promise((res, rej) => {
-        writeStream.write(buffer, (err: any) => {
+        writeStream.write(buffer.subarray(0, bytesToWrite), (err: any) => {
           if (err) rej(err);
           else res(true);
         })
-      });
-
-      // Increment the total bytes written
-      bytesWritten += currentChunkSize;
+      })
     }
 
     // Close the write stream
@@ -146,6 +136,20 @@ async function setOfferedStorage(storage: number): Promise<boolean> {
     console.error(`Failed to set offered storage ${storage}:`, error);
     return false;
   }
+}
+
+
+// Function to open the file explorer at the 'hello-app' directory
+function openOfferedStorage() {
+  const homePath = app.getPath('home');
+  const helloAppPath = path.join(homePath, 'hello-app');
+  shell.openPath(helloAppPath).then(res => {
+    if (res) {
+      console.error('Failed to open storage directory:', res);
+    } else {
+      console.log(`Storage directory at ${helloAppPath} opened successfully`);
+    }
+  })
 }
 
 ipcMain.handle('fetch-data', async () => {
@@ -187,6 +191,10 @@ function createWindow() {
 
   ipcMain.handle('set-offered-storage', async (_, storage: number) => {
     return setOfferedStorage(storage);
+  });
+
+  ipcMain.handle('open-offered-storage', async () => {
+    openOfferedStorage();
   });
 
 

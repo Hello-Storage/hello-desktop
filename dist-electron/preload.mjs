@@ -21,6 +21,7 @@ electron.contextBridge.exposeInMainWorld("electron", {
   // ...
   getAvailableStorage: async () => electron.ipcRenderer.invoke("get-available-storage"),
   setOfferedStorage: async (storage) => electron.ipcRenderer.invoke("set-offered-storage", storage),
+  openOfferedStorage: () => electron.ipcRenderer.invoke("open-offered-storage"),
   onAlertTitle: (callback) => {
     electron.ipcRenderer.on("alert-title", (_, title) => callback(title));
   },

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+//import folder-icon.svg located at src/assets/icons/folder-icon.svg
+import folderIcon from '../../assets/folder-icon.svg';
 
 
 
@@ -40,13 +42,22 @@ const StorageDragBar: React.FC<StorageDragBarProps> = ({ storage, maxStorage, ha
                     onChange={handleSelectedStorage}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-slider"
                 />
+                <button
+                    onClick={async () => await window.electron.openOfferedStorage()}
+                    disabled={storage === 0}
+                    className={`flex items-center ${storage === 0 ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed ' : 'bg-green-500 hover:bg-green-600 cursor-pointer '} text-white px-4 py-2 rounded mt-2`}
+                >
+
+                <img src={folderIcon} alt="folder icon" className="h-5 w-5 mr-2" />
+                    Open Storage Folder
+                </button>
 
             </div>
             <div className="w-full flex flex-col items-center" >
                 {/*Button to handle the change of Storage*/}
                 <button
                     onClick={() => handleStorageChange(selectedStorage)}
-                    className={`${selectedStorage === storage? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed ' : 'bg-blue-500 hover:bg-blue-600 cursor-pointer '}text-white px-4 py-2 rounded mt-4`}
+                    className={`${selectedStorage === storage ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed ' : 'bg-blue-500 hover:bg-blue-600 cursor-pointer '}text-white px-4 py-2 rounded mt-4`}
                     disabled={selectedStorage === storage}
                 >UPDATE STORAGE ({selectedStorage} GB)</button>
                 {/*Button to remove storage that is active if offered storage is not 0*/}

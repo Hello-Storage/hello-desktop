@@ -1,6 +1,5 @@
-import { useAppSelector } from "./hooks/storeHooks"
-import Counter from "./Counter";
 import Dashboard from "./Dashboard";
+import LoginScreen from "./LoginScreen";
 
 function App() {
   return (
@@ -10,6 +9,7 @@ function App() {
       <h1 className="text-4xl font-bold text-center">hello.app</h1>
       </div>
       <Dashboard />
+      <LoginScreen />
       
     </div>
   );

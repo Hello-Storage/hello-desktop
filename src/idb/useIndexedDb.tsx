@@ -11,9 +11,12 @@ const useIndexedDB = () => {
           if (!db.objectStoreNames.contains('settings')) {
             db.createObjectStore('settings');
           }
+          if (!db.objectStoreNames.contains('auth')) {
+            db.createObjectStore('auth'); // Create 'auth' object store
+          }
         },
       });
-      setDb(dbInstance as IDBPDatabase<unknown>)
+      setDb(dbInstance as IDBPDatabase<unknown>);
     };
 
     initDB();

@@ -1,4 +1,4 @@
-import { ipcMain, app, BrowserWindow, shell } from "electron";
+import { ipcMain, shell, app, BrowserWindow } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
@@ -16083,6 +16083,9 @@ function openOfferedStorage() {
     }
   });
 }
+ipcMain.handle("open-external", async (_, url2) => {
+  shell.openExternal(url2);
+});
 ipcMain.handle("fetch-data", async () => {
   try {
     const response = await axios.get("https://google.com");

@@ -1,7 +1,28 @@
 import React, { useState } from "react";
+import { useDispatch } from "react-redux";
+import { addToast, removeToast } from "./slices/errorSlice";
+import useAuth from "./hooks/useAuth";
+import { useModal } from "./components/modal";
+import OTPModal from "./components/modals/OTP";
+import useIndexedDB from "./idb/useIndexedDb";
+import { useAppSelector } from "./state";
+import Spinner3 from "./components/spinner/Spinner3";
 
 const LoginScreen: React.FC = () => {
+
+  const dispatch = useDispatch();
+
+  const db = useIndexedDB();
+
+  const { authenticated, loading } = useAppSelector((state) => state.user);
+  console.log(authenticated)
+
+  const { startOTP } = useAuth(db);
+
+
   const [email, setEmail] = useState("");
+
+  const [onPresent] = useModal(<OTPModal db={db} email={email} />);
 
   const handleGoogleLogin = () => {
     // Logic for Google login
@@ -11,10 +32,58 @@ const LoginScreen: React.FC = () => {
     // Logic for Wallet login
   };
 
-  const handleMagicLink = () => {
+  function validateEmail(email: string) {
+    const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(String(email).toLowerCase());
+  }
+
+  const handleMagicLink = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    console.log(email)
+
     // Logic to send magic link
-    console.log("Sending magic link to:", email);
+    // check if email has correct format (insert refex)
+    if (!validateEmail(email)) {
+      dispatch(
+        addToast({
+          id: Date.now(),
+          message: "Please enter a valid email",
+          type: "error",
+        })
+      )
+      return;
+    }
+
+    const toastId = Date.now();
+    dispatch(
+      addToast({
+        id: toastId,
+        message: "Sending magic link...",
+        type: "info",
+      })
+    )
+
+    const result = await startOTP(email.trim());
+
+    if (result) onPresent();
+
+    // remove toast
+    dispatch(
+      removeToast(
+        toastId,
+      )
+    )
+
+
+
   };
+
+
+  if (loading) return <Spinner3 />;
+  if (authenticated) {
+    alert("authenticated")
+    //return redirectUrl ? <Navigate to={redirectUrl} /> : <Navigate to="/space/my-storage" />;
+  }
 
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -23,9 +92,6 @@ const LoginScreen: React.FC = () => {
           <h1 className="text-3xl font-bold">Welcome 👋</h1>
           <p className="mt-2 text-gray-600">
             Select your favorite login option
-          </p>
-          <p className="mt-1 font-semibold">
-            Get your <span className="text-black">100GB</span> free storage now!
           </p>
         </div>
 
@@ -69,7 +135,15 @@ const LoginScreen: React.FC = () => {
         </div>
 
         <div className="text-center mt-8 text-sm text-gray-500">
-          <p>More information here</p>
+          <button onClick={() => {
+            // Logic to redirect to docs.hello.app
+            window.electron.openExternal("https://docs.hello.app");
+          }}
+            className="text-blue-500 hover:underline"
+          >
+            More information here
+          </button>
+
           <p className="mt-2">© 2024 hello.app</p>
         </div>
       </div>

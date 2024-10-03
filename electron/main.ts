@@ -152,6 +152,12 @@ function openOfferedStorage() {
   })
 }
 
+// Function called open external to open a link in the default browser
+ipcMain.handle('open-external', async (_, url: string) => {
+  shell.openExternal(url);
+});
+
+
 ipcMain.handle('fetch-data', async () => {
   try {
     const response = await axios.get('https://google.com');

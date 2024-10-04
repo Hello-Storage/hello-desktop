@@ -3,9 +3,11 @@ import type { TypedUseSelectorHook } from "react-redux";
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 
 import userReducer from "./user/reducer";
+import errorReducer from "../slices/errorSlice";
 
 const rootReducer = combineReducers({
   user: userReducer,
+  error: errorReducer,
 });
 
 
@@ -22,6 +24,7 @@ export const state = configureStore({
 
 export type AppState = ReturnType<typeof state.getState>;
 export type AppDispatch = typeof state.dispatch;
+
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<AppState> = useSelector;
 

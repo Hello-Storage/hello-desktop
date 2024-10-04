@@ -1,9 +1,9 @@
 // store personalSignature in SS and set axios headers if we do have a token
 
-import useIndexedDB from "../idb/useIndexedDb";
+import { IDBPDatabase } from "idb";
 
-const setPersonalSignature = (personalSignature?: string) => {
-  const db = useIndexedDB(); // Get the IndexedDB instance
+
+const setPersonalSignature = async (db: IDBPDatabase<unknown> | null, personalSignature?: string) => {
 
   if (personalSignature) {
     sessionStorage.setItem("personal_signature", personalSignature);
@@ -11,8 +11,8 @@ const setPersonalSignature = (personalSignature?: string) => {
     if (db) {
       const tx = db.transaction("auth", "readwrite");
       const store = tx.objectStore("auth");
-      store.put(personalSignature, "personal_signature");
-      tx.done.catch((error) => console.error("Failed to store token in IndexedDB:", error));
+      await store.put(personalSignature, "personal_signature");
+      await tx.done.catch((error) => console.error("Failed to store token in IndexedDB:", error));
     }
   } else {
     sessionStorage.removeItem("personal_signature");
@@ -20,8 +20,8 @@ const setPersonalSignature = (personalSignature?: string) => {
     if (db) {
       const tx = db.transaction("auth", "readwrite");
       const store = tx.objectStore("auth");
-      store.delete("personal_signature");
-      tx.done.catch((error) => console.error("Failed to delete token from IndexedDB:", error));
+      await store.delete("personal_signature");
+      await tx.done.catch((error) => console.error("Failed to delete token from IndexedDB:", error));
     }
   }
 };

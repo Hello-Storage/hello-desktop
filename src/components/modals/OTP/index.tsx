@@ -9,9 +9,9 @@ import useModal from "../../modal/useModal";
 import Modal from "../../modal/Modal";
 import { IDBPDatabase } from "idb";
 
-export default function OTPModal({ db, email }: { db: IDBPDatabase<unknown> | null, email: string }) {
+export default function OTPModal({ db, dbReady, email }: { db: IDBPDatabase<unknown> | null, dbReady: boolean, email: string }) {
   const dispatch = useDispatch();
-  const { verifyOTP } = useAuth(db);
+  const { verifyOTP } = useAuth(db, dbReady);
   const [, onDismiss] = useModal(<></>);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);

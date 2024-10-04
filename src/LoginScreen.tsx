@@ -7,22 +7,23 @@ import OTPModal from "./components/modals/OTP";
 import useIndexedDB from "./idb/useIndexedDb";
 import { useAppSelector } from "./state";
 import Spinner3 from "./components/spinner/Spinner3";
+import { IndexedDBProvider } from "./idb/IndexedDBContext";
 
 const LoginScreen: React.FC = () => {
 
+  const { db, dbReady } = useIndexedDB();
   const dispatch = useDispatch();
-
-  const db = useIndexedDB();
 
   const { authenticated, loading } = useAppSelector((state) => state.user);
   console.log(authenticated)
+  console.log(loading)
 
-  const { startOTP } = useAuth(db);
+  const { startOTP } = useAuth(db, dbReady);
 
 
   const [email, setEmail] = useState("");
 
-  const [onPresent] = useModal(<OTPModal db={db} email={email} />);
+  const [onPresent] = useModal(<OTPModal db={db} dbReady={dbReady} email={email} />);
 
   const handleGoogleLogin = () => {
     // Logic for Google login
@@ -38,11 +39,13 @@ const LoginScreen: React.FC = () => {
   }
 
   const handleMagicLink = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    console.log(email)
+    e.preventDefault();
+    if (!dbReady) {
+      console.error("Database not ready yet.");
+      return;
+    }
 
-    // Logic to send magic link
-    // check if email has correct format (insert refex)
+    console.log(email);
     if (!validateEmail(email)) {
       dispatch(
         addToast({
@@ -50,7 +53,7 @@ const LoginScreen: React.FC = () => {
           message: "Please enter a valid email",
           type: "error",
         })
-      )
+      );
       return;
     }
 
@@ -61,29 +64,15 @@ const LoginScreen: React.FC = () => {
         message: "Sending magic link...",
         type: "info",
       })
-    )
+    );
 
     const result = await startOTP(email.trim());
-
     if (result) onPresent();
 
-    // remove toast
-    dispatch(
-      removeToast(
-        toastId,
-      )
-    )
-
-
-
+    dispatch(removeToast(toastId));
   };
 
-
   if (loading) return <Spinner3 />;
-  if (authenticated) {
-    alert("authenticated")
-    //return redirectUrl ? <Navigate to={redirectUrl} /> : <Navigate to="/space/my-storage" />;
-  }
 
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -151,4 +140,11 @@ const LoginScreen: React.FC = () => {
   );
 };
 
-export default LoginScreen;
+export default function AppWrapper() {
+  return (
+    <IndexedDBProvider>
+      <LoginScreen />
+    </IndexedDBProvider>
+  );
+}
+

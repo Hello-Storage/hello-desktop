@@ -8,6 +8,41 @@ import useIndexedDB from "./idb/useIndexedDb";
 import { useAppSelector } from "./state";
 import Spinner3 from "./components/spinner/Spinner3";
 import { IndexedDBProvider } from "./idb/IndexedDBContext";
+import MetaMaskSDK, { SDKProvider } from "@metamask/sdk";
+import QRCode from 'qrcode';
+
+
+
+// MetaMask SDK
+const sdk = new MetaMaskSDK({
+  shouldShimWeb3: false,
+  storage: {
+    enabled: true,
+  },
+  dappMetadata: {
+    name: 'Electron Test Dapp',
+    url: 'https://www.electronjs.org/',
+  },
+  modals: {
+    install: ({ link }) => {
+      const qrCodeDOM = document.getElementById('qrCode');
+      QRCode.toCanvas(qrCodeDOM, link, (error: any) => {
+        if (error) console.error(error)
+      })
+      return {};
+    },
+    otp: () => {
+      const otpDOM = document.getElementById('otp');
+      return {
+        updateOTPValue: (otpValue) => {
+          if (otpValue !== '') {
+            otpDOM!.innerText = otpValue;
+          }
+        },
+      };
+    },
+  },
+});
 
 const LoginScreen: React.FC = () => {
 
@@ -29,8 +64,37 @@ const LoginScreen: React.FC = () => {
     // Logic for Google login
   };
 
-  const handleWalletLogin = () => {
+
+  // Helper functions
+  function updateDOM(domElement: HTMLElement, value: string) {
+    domElement.innerText = value;
+  }
+
+
+  const handleWalletLogin = async () => {
+
+    // App State
+    let account = ''
+    let chainId = ''
+    let response = ''
+    let provider: SDKProvider | undefined;
+
+
     // Logic for Wallet login
+    await sdk.connect().then((accounts) => {
+      provider = sdk.getProvider();
+      account = accounts?.[0];
+      //setEventListeners();
+      //updateDOM(accountsDOM, account);
+      //connectButtonDOM.textContent = 'Connected';
+      //qrCodeDOM.style.display = 'none';
+      //chainId = provider.getChainId();
+      //updateDOM(chainDOM, chainId);
+      //toggleButtons();
+    })
+      .catch((error) => {
+        console.error(error);
+      });
   };
 
   function validateEmail(email: string) {
@@ -100,7 +164,9 @@ const LoginScreen: React.FC = () => {
             className="flex items-center justify-center w-full bg-purple-600 text-white rounded-md py-2 hover:bg-purple-700"
             onClick={handleWalletLogin}
           >
-            <span className="mr-2">💼</span> Wallet
+            <span className="mr-2">💼</span> Metamask
+            <canvas id="qrCode"></canvas>
+            <h1 id="otp"></h1>
           </button>
 
           <div className="relative text-center text-gray-500">

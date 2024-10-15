@@ -1,6 +1,6 @@
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "../stores/store";
+import { RootState } from "../state";
 import { removeToast } from "../slices/errorSlice";
 
 const ErrorMessageQueue: React.FC = () => {

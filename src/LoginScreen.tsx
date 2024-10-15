@@ -8,41 +8,9 @@ import useIndexedDB from "./idb/useIndexedDb";
 import { useAppSelector } from "./state";
 import Spinner3 from "./components/spinner/Spinner3";
 import { IndexedDBProvider } from "./idb/IndexedDBContext";
-import MetaMaskSDK, { SDKProvider } from "@metamask/sdk";
-import QRCode from 'qrcode';
+import MetaMaskWalletComponent from "./components/MetamaskLoginComponent";
 
 
-
-// MetaMask SDK
-const sdk = new MetaMaskSDK({
-  shouldShimWeb3: false,
-  storage: {
-    enabled: true,
-  },
-  dappMetadata: {
-    name: 'Electron Test Dapp',
-    url: 'https://www.electronjs.org/',
-  },
-  modals: {
-    install: ({ link }) => {
-      const qrCodeDOM = document.getElementById('qrCode');
-      QRCode.toCanvas(qrCodeDOM, link, (error: any) => {
-        if (error) console.error(error)
-      })
-      return {};
-    },
-    otp: () => {
-      const otpDOM = document.getElementById('otp');
-      return {
-        updateOTPValue: (otpValue) => {
-          if (otpValue !== '') {
-            otpDOM!.innerText = otpValue;
-          }
-        },
-      };
-    },
-  },
-});
 
 const LoginScreen: React.FC = () => {
 
@@ -50,8 +18,6 @@ const LoginScreen: React.FC = () => {
   const dispatch = useDispatch();
 
   const { authenticated, loading } = useAppSelector((state) => state.user);
-  console.log(authenticated)
-  console.log(loading)
 
   const { startOTP } = useAuth(db, dbReady);
 
@@ -64,38 +30,6 @@ const LoginScreen: React.FC = () => {
     // Logic for Google login
   };
 
-
-  // Helper functions
-  function updateDOM(domElement: HTMLElement, value: string) {
-    domElement.innerText = value;
-  }
-
-
-  const handleWalletLogin = async () => {
-
-    // App State
-    let account = ''
-    let chainId = ''
-    let response = ''
-    let provider: SDKProvider | undefined;
-
-
-    // Logic for Wallet login
-    await sdk.connect().then((accounts) => {
-      provider = sdk.getProvider();
-      account = accounts?.[0];
-      //setEventListeners();
-      //updateDOM(accountsDOM, account);
-      //connectButtonDOM.textContent = 'Connected';
-      //qrCodeDOM.style.display = 'none';
-      //chainId = provider.getChainId();
-      //updateDOM(chainDOM, chainId);
-      //toggleButtons();
-    })
-      .catch((error) => {
-        console.error(error);
-      });
-  };
 
   function validateEmail(email: string) {
     const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -160,6 +94,7 @@ const LoginScreen: React.FC = () => {
             />
           </button>
 
+          {/*
           <button
             className="flex items-center justify-center w-full bg-purple-600 text-white rounded-md py-2 hover:bg-purple-700"
             onClick={handleWalletLogin}
@@ -168,7 +103,9 @@ const LoginScreen: React.FC = () => {
             <canvas id="qrCode"></canvas>
             <h1 id="otp"></h1>
           </button>
+          */}
 
+          <MetaMaskWalletComponent />
           <div className="relative text-center text-gray-500">
             <span>Or</span>
           </div>

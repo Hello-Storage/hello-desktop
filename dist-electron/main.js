@@ -11711,7 +11711,7 @@ FormData$1.prototype.append = function(field, value, options) {
   if (typeof value == "number") {
     value = "" + value;
   }
-  if (util.isArray(value)) {
+  if (Array.isArray(value)) {
     this._error(new Error("Arrays are not supported."));
     return;
   }
@@ -12314,7 +12314,7 @@ function stringifySafely(rawValue, parser, encoder) {
       }
     }
   }
-  return (encoder || JSON.stringify)(rawValue);
+  return (0, JSON.stringify)(rawValue);
 }
 const defaults = {
   transitional: transitionalDefaults,
@@ -15241,7 +15241,7 @@ const composeSignals = (signals, timeout) => {
 };
 const streamChunk = function* (chunk, chunkSize) {
   let len = chunk.byteLength;
-  if (!chunkSize || len < chunkSize) {
+  if (len < chunkSize) {
     yield chunk;
     return;
   }

@@ -1,12 +1,12 @@
-import { CID } from "multiformats/cid"
-import { sha256 } from "multiformats/hashes/sha2"
-import { logoutUser } from "state/user/actions";
-import { EncryptionStatus, File as FileType, Folder } from "api";
-import { toast } from "react-toastify";
-import { setUploadStatusAction } from "state/uploadstatus/actions";
-import * as digest from 'multiformats/hashes/digest'
-import { AppDispatch } from "state";
-import { createSHA256 } from "hash-wasm";
+//import { CID } from "multiformats/cid"
+//import { sha256 } from "multiformats/hashes/sha2"
+//import { logoutUser } from "state/user/actions";
+//import { EncryptionStatus, File as FileType, Folder } from "api";
+//import { toast } from "react-toastify";
+//import { setUploadStatusAction } from "state/uploadstatus/actions";
+//import * as digest from 'multiformats/hashes/digest'
+//import { AppDispatch } from "state";
+//import { createSHA256 } from "hash-wasm";
 
 const RAW_CODEC = 0x55
 

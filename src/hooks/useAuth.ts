@@ -18,6 +18,7 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
             state.dispatch(loadingUser());
             if (!dbReady || !db) {
                 console.error("Database not initialized");
+                alert("database not initialized")
                 throw new Error("Database not initialized");
 
             }
@@ -38,11 +39,10 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
                         accountType,
                         privateKey
                     );
-                    setPersonalSignature(db, signature);
+                    setPersonalSignature(db, dbReady, signature);
                     // Store personal signature in IndexedDB
                     await db.put('auth', signature, 'personal_signature');
                 }
-                console.log("t")
 
                 state.dispatch(loadUser(loadResp.data));
             }
@@ -50,6 +50,46 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
         } catch (error) {
             state.dispatch(loadUserFail());
         }
+    }, []);
+
+
+    const login = useCallback(async (wallet_address: string, personalSign: (message: string) => Promise<string>) => {
+        //const referral = new URLSearchParams(window.location.search).get("ref");
+        localStorage.removeItem("access_token");
+        alert("removing auth token")
+        setAuthToken(db, dbReady);
+        localStorage.removeItem("account_type")
+        setAccountType(db, dbReady);
+        sessionStorage.removeItem("personal_signature");
+        setPersonalSignature(db, dbReady);
+
+        const nonceResp = await Api.post<string>("/nonce", {
+            wallet_address,
+            //referral,
+        });
+
+
+        const message = `Greetings from hello\nSign this message to log into hello\nnonce: ${nonceResp.data}`;
+
+        const signature = await personalSign(message).catch((error) => {
+            throw new Error(error);
+        });
+
+        if (!signature) {
+            throw new Error("Failed to sign message");
+        }
+
+        const loginResp = await Api.post<LoginResponse>("/login", {
+            wallet_address,
+            signature,
+            //referral,
+        });
+
+        setAuthToken(db, dbReady, loginResp.data.access_token);
+        setAccountType(db, dbReady, "provider")
+
+        await load(db, dbReady);
+
     }, []);
 
 
@@ -82,8 +122,8 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
 
             if (dbReady && db) {
                 // Store the access token and account type using IndexedDB
-                await setAuthToken(db, result.data.access_token);
-                await setAccountType(db, "email");
+                await setAuthToken(db, dbReady, result.data.access_token);
+                await setAccountType(db, dbReady, "email");
 
                 // Load the authenticated state
                 await load(db, dbReady);
@@ -96,16 +136,24 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
     };
 
 
-    const logout = useCallback(async () => {
+    const logout = useCallback(async (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
+        if (!dbReady || !db) {
+            console.error("Database not initialized");
+            throw new Error("Database not initialized");
+
+        }
+
         try {
+            console.log("logging out")
 
             const token = await db?.get("auth", "access_token")
             if (token) {
+                db.put('settings', false, 'isMining');
                 await db?.delete("auth", "access_token")
-                setAuthToken(db, undefined);
+                setAuthToken(db, dbReady, undefined);
                 state.dispatch(logoutUser());
-                setPersonalSignature(db, undefined);
-                setAccountType(db, undefined);
+                setPersonalSignature(db, dbReady, undefined);
+                setAccountType(db, dbReady, undefined);
                 // TODO: metamask disconnect
                 //sdk.disconnect();
             }
@@ -114,7 +162,7 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
         }
     }, []);
 
-    return { startOTP, verifyOTP, load, logout };
+    return { login, startOTP, verifyOTP, load, logout };
 }
 
 export default useAuth;

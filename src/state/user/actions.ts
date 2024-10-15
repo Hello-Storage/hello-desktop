@@ -1,5 +1,5 @@
 import { createAction } from "@reduxjs/toolkit";
-import { LoadUserResponse } from "api";
+import { LoadUserResponse } from "../../api";
 import { Theme } from "./reducer";
 
 export const loadingUser = createAction("user/loading");

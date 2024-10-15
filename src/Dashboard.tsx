@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import useIndexedDB from './idb/useIndexedDb';
 import StorageDragBar from './components/storage/StorageDragBar';
+import { IndexedDBProvider } from './idb/IndexedDBContext';
+import LoginScreen from './LoginScreen';
 //import UploadButton from './components/UploadButton';
 //import DownloadButton from './components/DownloadButton';
 
@@ -21,7 +23,7 @@ declare global {
 
 // Functional Component
 const Dashboard: React.FC = () => {
-    const db = useIndexedDB();
+    const { db, dbReady } = useIndexedDB();
 
 
 
@@ -36,9 +38,13 @@ const Dashboard: React.FC = () => {
 
     // Load data from IndexedDB when the database is ready
     useEffect(() => {
-        if (!db) return;
+        if (!dbReady || !db) {
+            console.error("Database not initialized");
+            return;
+        }
 
         const loadData = async () => {
+
             setIsLoading(true)
             const savedBalance = await db.get('settings', 'currentBalance');
             const savedStorage = await db.get('settings', 'storage');
@@ -115,7 +121,6 @@ const Dashboard: React.FC = () => {
 
 
         // Set offered storage in the main process
-
         setIsLoading(true);
         setLoadingMessage('Setting offered storage...');
         const result = await window.electron.setOfferedStorage(b);
@@ -183,4 +188,12 @@ const Dashboard: React.FC = () => {
     );
 };
 
-export default Dashboard;
+export default function AppWrapper() {
+  return (
+    <IndexedDBProvider>
+      <Dashboard />
+    </IndexedDBProvider>
+  );
+}
+
+

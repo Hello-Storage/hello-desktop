@@ -9,6 +9,7 @@ import { useAppSelector } from "./state";
 import Spinner3 from "./components/spinner/Spinner3";
 import { IndexedDBProvider } from "./idb/IndexedDBContext";
 import MetaMaskWalletComponent from "./components/MetamaskLoginComponent";
+import GoogleLoginButton from "./components/auth/GoogleLoginButton";
 
 
 
@@ -72,6 +73,7 @@ const LoginScreen: React.FC = () => {
 
   if (loading) return <Spinner3 />;
 
+
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
@@ -83,16 +85,10 @@ const LoginScreen: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-4">
-          <button
-            className="flex items-center justify-center w-full bg-white border border-gray-300 text-gray-700 rounded-md py-2 hover:bg-gray-100"
-            onClick={handleGoogleLogin}
-          >
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_2013_Google.png"
-              alt="Google"
-              className="h-6 mr-2"
-            />
-          </button>
+         
+          
+            <GoogleLoginButton />
+          
 
           {/*
           <button

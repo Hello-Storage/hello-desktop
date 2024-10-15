@@ -124,7 +124,7 @@ const MetaMaskWalletComponent: React.FC = () => {
 
     return (
 
-        <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col gap-4">
             {showQrCode && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50"></div>
             )}

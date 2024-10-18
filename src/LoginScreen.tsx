@@ -75,10 +75,10 @@ const LoginScreen: React.FC = () => {
 
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
+    <div className="flex mt-2 items-center justify-center">
       <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold">Welcome 👋</h1>
+          <h1 className="text-3xl text-gray-600 font-bold">Welcome 👋</h1>
           <p className="mt-2 text-gray-600">
             Select your favorite login option
           </p>
@@ -108,7 +108,7 @@ const LoginScreen: React.FC = () => {
 
           <input
             type="email"
-            className="border border-gray-300 rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-purple-600"
+            className="border border-gray-300 rounded-md p-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-600"
             placeholder="example@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -122,7 +122,7 @@ const LoginScreen: React.FC = () => {
           </button>
         </div>
 
-        <div className="text-center mt-8 text-sm text-gray-500">
+        <div className="text-center mt-2 text-sm text-gray-500">
           <button onClick={() => {
             // Logic to redirect to docs.hello.app
             window.electron.openExternal("https://docs.hello.app");

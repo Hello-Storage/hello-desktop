@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       screens: {
-        
+
       },
       colors: {
         "primary-black": "#0D1117",
@@ -26,9 +26,14 @@ export default {
           "0%": { transform: "translateY(-50%) rotate(0deg)" },
           "100%": { transform: "translateY(-50%) rotate(360deg)" },
         },
+        blink: {
+          '0%, 100%': { opacity: '0' },
+          '50%': { opacity: '1' },
+        },
       },
       animation: {
         disco: "disco 3s linear infinite",
+        blink: 'blink 1s steps(2, start) infinite',
       },
     },
   },

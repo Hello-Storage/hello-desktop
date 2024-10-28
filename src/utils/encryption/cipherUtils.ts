@@ -17,7 +17,7 @@ export const signPersonalSignature = async (address: string, account_type: Accou
 
     let signature = "";
     if (account_type === AccountType.Provider) {
-        alert("Provider account type not supported yet")
+        //alert("Provider account type not supported yet")
         //https://docs.metamask.io/wallet/how-to/use-sdk/javascript/react/
         
         //signature = await signMessage({ message })

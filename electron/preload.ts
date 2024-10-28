@@ -1,7 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
-
-
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electron', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
@@ -21,8 +19,9 @@ contextBridge.exposeInMainWorld('electron', {
     return ipcRenderer.invoke(channel, ...omit)
   },
 
-  // You can expose other APTs you need here.
+  // You can expose other APis you need here.
   // ...
+
   getAvailableStorage: async () => ipcRenderer.invoke('get-available-storage'),
   setOfferedStorage: async (storage: number) => ipcRenderer.invoke('set-offered-storage', storage),
   openOfferedStorage: () => ipcRenderer.invoke('open-offered-storage'),
@@ -31,5 +30,6 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('alert-title', (_, title) => callback(title));
   },
   fetchData: () => ipcRenderer.invoke('fetch-data'),
-
+  startMining: () => ipcRenderer.invoke('start-mining'),
+  stopMining: () => ipcRenderer.invoke('stop-mining'),
 })

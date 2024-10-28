@@ -1,9 +1,10 @@
-import { ipcMain, shell, app, BrowserWindow } from "electron";
+import { ipcMain, shell, app, BrowserWindow, Tray, Menu } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
 import os from "node:os";
 import { promises } from "node:fs";
+import { Worker } from "worker_threads";
 import { checkSync } from "diskusage";
 import require$$1, { TextEncoder as TextEncoder$1 } from "util";
 import stream, { Readable } from "stream";
@@ -15995,7 +15996,7 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
+let mainWindow;
 async function getAvailableStorage() {
   const pathToCheck = app.getPath("home");
   try {
@@ -16095,8 +16096,8 @@ ipcMain.handle("fetch-data", async () => {
   }
 });
 function createWindow() {
-  win = new BrowserWindow({
-    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+  mainWindow = new BrowserWindow({
+    icon: path$1.join(process.env.VITE_PUBLIC, "electron-logo.jpg"),
     webPreferences: {
       preload: path$1.join(__dirname, "preload.mjs"),
       contextIsolation: true,
@@ -16104,13 +16105,13 @@ function createWindow() {
       webSecurity: false
     }
   });
-  win.webContents.on("did-finish-load", () => {
-    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow == null ? void 0 : mainWindow.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
+    mainWindow.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+    mainWindow.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
   ipcMain.handle("get-available-storage", async () => {
     return getAvailableStorage();
@@ -16121,22 +16122,68 @@ function createWindow() {
   ipcMain.handle("open-offered-storage", async () => {
     openOfferedStorage();
   });
+  ipcMain.handle("start-mining", async () => {
+    miningWorker.postMessage("start");
+  });
+  ipcMain.handle("stop-mining", async () => {
+    miningWorker.postMessage("stop");
+  });
   setTimeout(() => {
-    win == null ? void 0 : win.webContents.send("alert-title", "Hello from Main Process!");
+    mainWindow == null ? void 0 : mainWindow.webContents.send("alert-title", "Hello from Main Process!");
   }, 5e3);
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+app.on("window-all-closed", (event) => {
+  event.preventDefault();
 });
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
-app.whenReady().then(createWindow);
+app.on("before-quit", () => {
+  miningWorker.postMessage("stop");
+  miningWorker.terminate();
+});
+let tray = null;
+app.whenReady().then(() => {
+  createWindow();
+  tray = new Tray(path$1.join(process.env.VITE_PUBLIC, "electron-logo.jpg"));
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: "Show App",
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+        }
+      }
+    },
+    {
+      label: "Quit",
+      click: () => {
+        tray == null ? void 0 : tray.destroy();
+        if (process.platform !== "darwin") {
+          app.quit();
+          mainWindow = null;
+        }
+      }
+    }
+  ]);
+  tray.setContextMenu(contextMenu);
+  mainWindow == null ? void 0 : mainWindow.on("close", (event) => {
+    event.preventDefault();
+    mainWindow == null ? void 0 : mainWindow.hide();
+  });
+});
+const miningWorker = new Worker("./miningWorker.cjs");
+miningWorker.on("message", (message) => {
+  console.log("Message from worker:", message);
+});
+setInterval(() => {
+  sendDataToServer();
+}, 3600);
+function sendDataToServer() {
+  console.log("Sending data to server...");
+}
 export {
   MAIN_DIST,
   RENDERER_DIST,

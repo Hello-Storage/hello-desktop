@@ -12,6 +12,8 @@ declare global {
       setOfferedStorage: (storage: number) => Promise<boolean>;
       openOfferedStorage: () => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+      startMining: () => Promise<void>;
+      stopMining: () => Promise<void>;
     };
   }
 }

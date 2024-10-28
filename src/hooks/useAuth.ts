@@ -53,10 +53,9 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
     }, []);
 
 
-    const login = useCallback(async (wallet_address: string, personalSign: (message: string) => Promise<string>) => {
+    const login = useCallback(async (db: IDBPDatabase<unknown> | null, dbReady: boolean, wallet_address: string, personalSign: (message: string) => Promise<string>) => {
         //const referral = new URLSearchParams(window.location.search).get("ref");
         localStorage.removeItem("access_token");
-        alert("removing auth token")
         setAuthToken(db, dbReady);
         localStorage.removeItem("account_type")
         setAccountType(db, dbReady);
@@ -79,6 +78,8 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
             throw new Error("Failed to sign message");
         }
 
+        console.log(message)
+        console.log(signature)
         const loginResp = await Api.post<LoginResponse>("/login", {
             wallet_address,
             signature,
@@ -88,7 +89,10 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
         setAuthToken(db, dbReady, loginResp.data.access_token);
         setAccountType(db, dbReady, "provider")
 
-        await load(db, dbReady);
+        await load(db, dbReady).catch((error) => {
+            throw new Error(error);
+        }
+        );
 
     }, []);
 

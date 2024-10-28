@@ -17,7 +17,7 @@ electron.contextBridge.exposeInMainWorld("electron", {
     const [channel, ...omit] = args;
     return electron.ipcRenderer.invoke(channel, ...omit);
   },
-  // You can expose other APTs you need here.
+  // You can expose other APis you need here.
   // ...
   getAvailableStorage: async () => electron.ipcRenderer.invoke("get-available-storage"),
   setOfferedStorage: async (storage) => electron.ipcRenderer.invoke("set-offered-storage", storage),
@@ -26,5 +26,7 @@ electron.contextBridge.exposeInMainWorld("electron", {
   onAlertTitle: (callback) => {
     electron.ipcRenderer.on("alert-title", (_, title) => callback(title));
   },
-  fetchData: () => electron.ipcRenderer.invoke("fetch-data")
+  fetchData: () => electron.ipcRenderer.invoke("fetch-data"),
+  startMining: () => electron.ipcRenderer.invoke("start-mining"),
+  stopMining: () => electron.ipcRenderer.invoke("stop-mining")
 });

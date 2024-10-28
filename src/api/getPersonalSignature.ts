@@ -7,7 +7,7 @@ import { AccountType } from "./types";
 
 
 
-const getPersonalSignature = async (db: IDBPDatabase<unknown> | null, walletAddress: string, autoEncryption: boolean, accountType: string | undefined, logout?: () => void): Promise<string | undefined> => {
+const getPersonalSignature = async (db: IDBPDatabase<unknown> | null, dbReady: boolean, walletAddress: string, autoEncryption: boolean, accountType: string | undefined, logout?: () => void): Promise<string | undefined> => {
     const personalSignature = sessionStorage.getItem("personal_signature");
     if (personalSignature !== null && autoEncryption) {
         return personalSignature;
@@ -15,7 +15,7 @@ const getPersonalSignature = async (db: IDBPDatabase<unknown> | null, walletAddr
         if (accountType === AccountType.Provider) {
             try {
                 const personalSignature = await signPersonalSignature(walletAddress, AccountType.Provider);
-                setPersonalSignature(db, personalSignature);
+                setPersonalSignature(db, dbReady, personalSignature);
                 return personalSignature;
             } catch (error: any) {
                 alert(error);

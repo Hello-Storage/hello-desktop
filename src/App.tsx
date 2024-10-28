@@ -111,8 +111,9 @@ function App() {
         {/* Header */}
         <div className="flex justify-between items-center p-4 bg-gray-800">
           {/* hello.app with blinking cursor */}
+         
           <a
-            href="https://hello.app"
+            onClick={() => window.electron.openExternal("https://hello.app")}
             target="_blank"
             rel="noopener noreferrer"
             className="text-white text-4xl font-bold select-none relative cursor-pointer rounded-b-lg pb-1"
@@ -143,7 +144,7 @@ function App() {
         <div className="flex justify-between items-center p-4">
               <div className="flex items-center">
                 <FaUserCircle className="text-white text-2xl mr-2" />
-                <span className="text-white mr-4">{name}</span>
+                <span className="text-white mr-4">{walletFormatting(name)}</span>
                 <div className="flex items-center">
                   <FaWallet className="text-white text-xl mr-1" />
                   <span className="text-white">{walletFormatting(walletAddress)}</span>

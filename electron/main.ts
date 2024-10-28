@@ -1,9 +1,12 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+// main.ts
+import { app, BrowserWindow, ipcMain, Menu, shell, Tray } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os';
 import { promises as fsPromises } from 'node:fs';
+// import worker
+import { Worker } from 'worker_threads';
 
 
 import { checkSync } from 'diskusage';
@@ -32,7 +35,7 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-let win: BrowserWindow | null
+let mainWindow: BrowserWindow | null
 
 // Function to get available storage
 async function getAvailableStorage(): Promise<number> {
@@ -168,8 +171,8 @@ ipcMain.handle('fetch-data', async () => {
 })
 
 function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+  mainWindow = new BrowserWindow({
+    icon: path.join(process.env.VITE_PUBLIC, 'electron-logo.jpg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -179,15 +182,15 @@ function createWindow() {
   })
 
   // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    mainWindow.loadURL(VITE_DEV_SERVER_URL)
   } else {
     // win.loadFile('dist/index.html')
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 
   // Listen for IPC event to get available storage
@@ -202,11 +205,19 @@ function createWindow() {
   ipcMain.handle('open-offered-storage', async () => {
     openOfferedStorage();
   });
+  
+  ipcMain.handle('start-mining', async () => {
+    miningWorker.postMessage('start');
+  });
+
+  ipcMain.handle('stop-mining', async () => {
+    miningWorker.postMessage('stop');
+  });
 
 
   // Emit the event with the string after 5 seconds (as an example)
   setTimeout(() => {
-    win?.webContents.send('alert-title', 'Hello from Main Process!');
+    mainWindow?.webContents.send('alert-title', 'Hello from Main Process!');
   }, 5000);
 
 }
@@ -215,11 +226,15 @@ function createWindow() {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', (event: Event) => {
+  event.preventDefault(); // Prevents the app from quitting when all windows are closed
+
+  /*
   if (process.platform !== 'darwin') {
     app.quit()
-    win = null
+    mainWindow = null
   }
+    */
 })
 
 app.on('activate', () => {
@@ -230,4 +245,65 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.on('before-quit', () => {
+  miningWorker.postMessage('stop');
+  miningWorker.terminate();
+})
+
+let tray: Tray | null = null;
+
+app.whenReady().then(() => {
+  createWindow()
+
+  tray = new Tray(path.join(process.env.VITE_PUBLIC, 'electron-logo.jpg'));
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App', click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+        }
+      }
+    },
+    {
+      label: 'Quit', click: () => {
+
+        tray?.destroy();
+        if (process.platform !== 'darwin') {
+          app.quit()
+          mainWindow = null
+        }
+      }
+    },
+  ]);
+  tray.setContextMenu(contextMenu);
+
+  mainWindow?.on('close', (event) => {
+    event.preventDefault();
+    mainWindow?.hide();
+  })
+
+
+  //createWindow()
+
+})
+
+
+// Start the mining worker
+const miningWorker = new Worker('./miningWorker.js');
+miningWorker.on('message', (message) => {
+  console.log('Message from worker:', message);
+});
+
+
+setInterval(() => {
+  // Collect data from the mining process
+  // Send data to the server
+  sendDataToServer();
+}, 3600); // 3600000 milliseconds = 1 hour
+
+function sendDataToServer() {
+  // Implement your data transmission logic here
+  // Use HTTPS and proper error handling
+  // Example:
+  console.log('Sending data to server...');
+}

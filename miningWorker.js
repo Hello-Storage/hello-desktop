@@ -1,37 +1,66 @@
 // miningWorker.js
-const { parentPort } = require('worker_threads');
-const crypto = require('node:crypto');
+import { parentPort } from 'worker_threads';
+const {
+    createHash,
+} = await import('node:crypto');
 
 let isMining = false;
+let nonce = 0;
+let solutionFound = false;
 
 function mine() {
-    // Mining logic
-    let nonce = 0;
-    const startTime = new Date();
 
-    console.log("mining")
-    while (isMining) {
-        const hash = crypto.createHash('sha256').update(String(nonce)).digest('hex');
-        // log each 10000th hash
-        if (nonce % 10000 === 0) {
-            console.log(`Hash: ${hash}`);
+    // Mining logic
+    const startTime = new Date();
+    function doMining() {
+        if (!isMining || solutionFound) {
+            console.log("Mining stopped");
+            return;
         }
-        if (hash.endsWith('00000000')) { // Example condition for proof of work
-            const endTime = new Date();
-            const duration = (endTime.getTime() - startTime.getTime()) / 60000; // Convert milliseconds to minutes
-            const message = `Mining took ${duration.toFixed(2)} minutes`;
-            parentPort.postMessage({ nonce, hash, message });
-            break;
+
+
+        for (let i = 0; i < 1000; i++) {
+
+            const hash = createHash('sha256').update(String(nonce)).digest('hex');
+            // log each 1000001th hash
+            if (nonce % 1000001 === 0) {
+                console.log(`Hash: ${hash}, nonce ${nonce}, i: ${i}`);
+            }
+            if (hash.endsWith('000000')) { // Example condition for proof of work
+                const endTime = new Date();
+                const duration = (endTime.getTime() - startTime.getTime()) / 60000; // Convert milliseconds to minutes
+                const message = `Mining took ${duration.toFixed(2)} minutes`;
+                parentPort.postMessage({ nonce, hash, message });
+                solutionFound = true
+                isMining = false
+                break;
+            }
+            nonce++;
+
+            // Periodically send nonce progress back to main thread
+            if (nonce % 100000 === 0) {
+                parentPort.postMessage({ nonce })
+            }
         }
-        nonce++;
+
+        if (!solutionFound) {
+            setImmediate(doMining);
+        }
     }
+
+    doMining()
 }
 
 parentPort.on('message', (message) => {
-    if (message === 'start') {
+    if (message.command === 'start') {
         isMining = true;
+        if (typeof message.nonce === 'number') {
+            nonce = message.nonce;
+        } else {
+            nonce = 0;
+        }
         mine();
-    } else if (message === 'stop') {
+    } else if (message.command === 'stop') {
         // Stop mining
         isMining = false;
     } else {

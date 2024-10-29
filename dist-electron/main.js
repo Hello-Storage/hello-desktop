@@ -15997,6 +15997,51 @@ const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let mainWindow;
+let lastKnownNonce = 0;
+var miningWorker;
+function startMiningWorker(startingNonce = 0) {
+  miningWorker = new Worker("./miningWorker.js");
+  miningWorker.postMessage({ command: "start", nonce: startingNonce });
+  miningWorker.on("message", (message) => {
+    console.log("Message from worker:", message);
+    if (message.nonce !== void 0) {
+      lastKnownNonce = message.nonce;
+    }
+    if (message.message && message.message.startsWith("Mining took")) {
+      lastKnownNonce = 0;
+      miningWorker.terminate();
+    }
+  });
+  miningWorker.on("error", (err) => {
+    console.error("Worker error:", err);
+  });
+  miningWorker.on("exit", (code) => {
+    console.log("Worker exited with code:", code);
+  });
+}
+let maxMem = 0;
+function logMemoryUsage() {
+  const used = process.memoryUsage();
+  const usedMem = used.rss;
+  const usedMemMB = usedMem / 1024 / 1024;
+  const usedMemStr = usedMem.toFixed(2);
+  if (usedMem > maxMem) {
+    maxMem = usedMemMB;
+  }
+  const freeMem = os.freemem();
+  const usedMemPercentage = usedMem / freeMem * 100;
+  console.log(`Memory Usage: RSS=${usedMemStr} MB (${usedMemPercentage.toFixed(2)}% of free memory)
+MaxMem: ${maxMem} MB`);
+  if (usedMemPercentage >= 10) {
+    console.log("Memory usage exceeds 10% of available free memory. Restarting worker.");
+    if (miningWorker) {
+      miningWorker.postMessage({ command: "stop" });
+      miningWorker.terminate();
+      startMiningWorker(lastKnownNonce);
+    }
+  }
+}
+setInterval(logMemoryUsage, 600);
 async function getAvailableStorage() {
   const pathToCheck = app.getPath("home");
   try {
@@ -16122,11 +16167,23 @@ function createWindow() {
   ipcMain.handle("open-offered-storage", async () => {
     openOfferedStorage();
   });
-  ipcMain.handle("start-mining", async () => {
-    miningWorker.postMessage("start");
-  });
+  ipcMain.handle(
+    "start-mining",
+    async () => {
+      console.log("starting mining");
+      if (!miningWorker || miningWorker.threadId === null || miningWorker.threadId === -1) {
+        console.log("starging worker function");
+        startMiningWorker();
+      } else {
+        console.log("sending start message");
+        miningWorker.postMessage({ command: "start" });
+      }
+    }
+  );
   ipcMain.handle("stop-mining", async () => {
-    miningWorker.postMessage("stop");
+    lastKnownNonce = 0;
+    miningWorker.postMessage({ command: "stop" });
+    miningWorker.terminate();
   });
   setTimeout(() => {
     mainWindow == null ? void 0 : mainWindow.webContents.send("alert-title", "Hello from Main Process!");
@@ -16174,13 +16231,9 @@ app.whenReady().then(() => {
     mainWindow == null ? void 0 : mainWindow.hide();
   });
 });
-const miningWorker = new Worker("./miningWorker.cjs");
-miningWorker.on("message", (message) => {
-  console.log("Message from worker:", message);
-});
 setInterval(() => {
   sendDataToServer();
-}, 3600);
+}, 36e5);
 function sendDataToServer() {
   console.log("Sending data to server...");
 }

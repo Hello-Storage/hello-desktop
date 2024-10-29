@@ -37,6 +37,82 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let mainWindow: BrowserWindow | null
 
+// Initialize the last known nonce value
+let lastKnownNonce = 0;
+
+
+// Start the mining worker with an optional starting nonce
+var miningWorker: Worker;
+function startMiningWorker(startingNonce = 0) {
+  miningWorker = new Worker('./miningWorker.js');
+
+  miningWorker.postMessage({ command: 'start', nonce: startingNonce });
+
+  miningWorker.on('message', (message) => {
+    console.log('Message from worker:', message);
+    if (message.nonce !== undefined) {
+      // Update the last known nonce value
+      lastKnownNonce = message.nonce;
+    }
+
+    if (message.message && message.message.startsWith('Mining took')) {
+      // Mining completed, terminate the worker
+      lastKnownNonce = 0
+      miningWorker.terminate();
+    }
+  });
+  miningWorker.on('error', (err) => {
+    console.error('Worker error:', err);
+  });
+  miningWorker.on('exit', (code) => {
+    console.log('Worker exited with code:', code);
+  });
+
+}
+
+
+let maxMem = 0
+
+function logMemoryUsage() {
+
+  const used = process.memoryUsage();
+  const usedMem = used.rss
+  const usedMemMB = usedMem / 1024 / 1024
+  const usedMemStr = usedMem.toFixed(2)
+
+  if (usedMem > maxMem) {
+    maxMem = usedMemMB
+  }
+
+  // Get available free memory
+  const freeMem = os.freemem(); // In bytes
+
+  const usedMemPercentage = (usedMem / freeMem) * 100;
+
+  console.log(`Memory Usage: RSS=${usedMemStr} MB (${usedMemPercentage.toFixed(2)}% of free memory)\nMaxMem: ${maxMem} MB`);
+
+  if (usedMemPercentage >= 10) {
+    console.log('Memory usage exceeds 10% of available free memory. Restarting worker.');
+    if (miningWorker) {
+      // Stop and terminate the current worker
+      miningWorker.postMessage({ command: 'stop' });
+      miningWorker.terminate();
+
+      // Start a new worker with the last known nonce value
+      startMiningWorker(lastKnownNonce);
+    }
+  }
+}
+
+
+
+setInterval(logMemoryUsage, 600); // Log every minute
+
+
+
+
+
+
 // Function to get available storage
 async function getAvailableStorage(): Promise<number> {
   const pathToCheck = app.getPath('home'); // Use home directory path
@@ -205,13 +281,23 @@ function createWindow() {
   ipcMain.handle('open-offered-storage', async () => {
     openOfferedStorage();
   });
-  
+
   ipcMain.handle('start-mining', async () => {
-    miningWorker.postMessage('start');
-  });
+    console.log("starting mining")
+    if (!miningWorker || miningWorker.threadId === null || miningWorker.threadId === -1) {
+      console.log("starging worker function")
+      startMiningWorker();
+    } else {
+      console.log("sending start message")
+      miningWorker.postMessage({command: 'start'});
+    }
+  }
+  );
 
   ipcMain.handle('stop-mining', async () => {
-    miningWorker.postMessage('stop');
+    lastKnownNonce = 0;
+    miningWorker.postMessage({command: 'stop'});
+    miningWorker.terminate();
   });
 
 
@@ -288,18 +374,11 @@ app.whenReady().then(() => {
 })
 
 
-// Start the mining worker
-const miningWorker = new Worker('./miningWorker.js');
-miningWorker.on('message', (message) => {
-  console.log('Message from worker:', message);
-});
-
-
 setInterval(() => {
   // Collect data from the mining process
   // Send data to the server
   sendDataToServer();
-}, 3600); // 3600000 milliseconds = 1 hour
+}, 3600000); // 3600000 milliseconds = 1 hour
 
 function sendDataToServer() {
   // Implement your data transmission logic here

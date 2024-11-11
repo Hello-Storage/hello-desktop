@@ -27,6 +27,6 @@ electron.contextBridge.exposeInMainWorld("electron", {
     electron.ipcRenderer.on("alert-title", (_, title) => callback(title));
   },
   fetchData: () => electron.ipcRenderer.invoke("fetch-data"),
-  startMining: () => electron.ipcRenderer.invoke("start-mining"),
+  startMining: (challenge) => electron.ipcRenderer.invoke("start-mining", challenge),
   stopMining: () => electron.ipcRenderer.invoke("stop-mining")
 });

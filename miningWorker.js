@@ -6,6 +6,7 @@ const {
 
 let isMining = false;
 let nonce = 0;
+let challenge = '';
 let solutionFound = false;
 
 function mine() {
@@ -21,15 +22,16 @@ function mine() {
 
         for (let i = 0; i < 1000; i++) {
 
-            const hash = createHash('sha256').update(String(nonce)).digest('hex');
+            const hash = createHash('sha256').update(challenge + String(nonce)).digest('hex');
             // log each 1000001th hash
             if (nonce % 1000001 === 0) {
                 console.log(`Hash: ${hash}, nonce ${nonce}, i: ${i}`);
             }
-            if (hash.endsWith('000000')) { // Example condition for proof of work
+            if (hash.endsWith('00000')) { // Example condition for proof of work
                 const endTime = new Date();
                 const duration = (endTime.getTime() - startTime.getTime()) / 60000; // Convert milliseconds to minutes
                 const message = `Mining took ${duration.toFixed(2)} minutes`;
+                console.log("Solution found", message)
                 parentPort.postMessage({ nonce, hash, message });
                 solutionFound = true
                 isMining = false
@@ -54,11 +56,15 @@ function mine() {
 parentPort.on('message', (message) => {
     if (message.command === 'start') {
         isMining = true;
+        if (typeof message.challenge === 'string') {
+            challenge = message.challenge;
+        }
         if (typeof message.nonce === 'number') {
             nonce = message.nonce;
         } else {
             nonce = 0;
         }
+        console.log("challenge at starting worker", challenge)
         mine();
     } else if (message.command === 'stop') {
         // Stop mining

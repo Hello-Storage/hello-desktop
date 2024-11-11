@@ -19,6 +19,11 @@ export interface LoadMinerResponse {
   rewardRate: string;
 }
 
+export interface GenerateMinerChallengeResponse {
+  challenge: string;
+  rewardRate: number;
+}
+
 export interface UserDetailResponse {
   storage_used: number;
   referral_storage: number;

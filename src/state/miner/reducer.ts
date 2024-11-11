@@ -48,5 +48,5 @@ export default createReducer<Miner>(initialState, (builder) => {
     .addCase(setOfferedStorage, (state, { payload }) => ({
       ...state,
       offeredStorageBytes: payload,
-    }));
+    }))
 });

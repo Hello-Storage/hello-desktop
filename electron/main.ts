@@ -38,21 +38,24 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let mainWindow: BrowserWindow | null
 
 // Initialize the last known nonce value
+let startTime = Date.now();
 let lastKnownNonce = 0;
+let lastKnownChallenge = "";
 
 
 // Start the mining worker with an optional starting nonce
 var miningWorker: Worker;
-function startMiningWorker(startingNonce = 0/*personalToken */) {
+function startMiningWorker(startingNonce = 0, challenge: string = "") {
   // get nonce from server and reward rate
   miningWorker = new Worker('./miningWorker.js');
 
-  miningWorker.postMessage({ command: 'start', nonce: startingNonce });
+  miningWorker.postMessage({ command: 'start', nonce: startingNonce, challenge: challenge });
 
   miningWorker.on('message', (message) => {
     if (message.nonce !== undefined) {
       // Update the last known nonce value
       lastKnownNonce = message.nonce;
+      lastKnownChallenge = message.challenge;
     } else {
       console.log('Message from worker:', message);
     }
@@ -60,8 +63,32 @@ function startMiningWorker(startingNonce = 0/*personalToken */) {
     if (message.message && message.message.startsWith('Mining took')) {
       // Mining completed, terminate the worker
       lastKnownNonce = 0
-      miningWorker.terminate();
-      // send result to server
+      lastKnownChallenge = ""
+      console.log(message)
+      //check if an hour with ten minute margin has passed since start time, if so send message to frontend
+      let currentTime = Date.now();
+      //let timeMargin = 600000; //10 minutes
+      //timeMargin of 5 seconds for testing
+      let timeMargin = 5000; //5 seconds
+      //mainWindow?.webContents.send('mining-complete', message);
+
+      // 1h mining cycle
+      //if (currentTime - startTime >= 3600000 - timeMargin) {
+      // 5 seconds mining cycle
+      if (currentTime - startTime >= 5000 - timeMargin) {
+        mainWindow?.webContents.send('mining-complete', message);
+        console.log("Mining cycle complete")
+        miningWorker.terminate();
+      } else {
+        //if enough time has not passed, wait for the remaining time and then send message to frontend
+        console.log("Waiting for remaining time to pass")
+        setTimeout(() => {
+          console.log("Mining cycle reached and complete")
+          mainWindow?.webContents.send('mining-complete', message);
+          miningWorker.terminate();
+        }, 3600000 - (currentTime - startTime));
+      }
+      
     }
   });
   miningWorker.on('error', (err) => {
@@ -102,7 +129,7 @@ function logMemoryUsage() {
       miningWorker.terminate();
 
       // Start a new worker with the last known nonce value
-      startMiningWorker(lastKnownNonce);
+      startMiningWorker(lastKnownNonce, lastKnownChallenge);
     }
   }
 }
@@ -285,12 +312,11 @@ function createWindow() {
     openOfferedStorage();
   });
 
-  ipcMain.handle('start-mining', async () => {
+  ipcMain.handle('start-mining', async (_, challenge: string) => {
     console.log("starting mining")
     if (!miningWorker || miningWorker.threadId === null || miningWorker.threadId === -1) {
       console.log("starging worker function")
-      //send personal token
-      startMiningWorker();
+      startMiningWorker(undefined, challenge = challenge);
     } else {
       console.log("sending start message")
       miningWorker.postMessage({ command: 'start' });
@@ -300,6 +326,7 @@ function createWindow() {
 
   ipcMain.handle('stop-mining', async () => {
     lastKnownNonce = 0;
+    lastKnownChallenge = "";
     if (miningWorker) {
       miningWorker.postMessage({ command: 'stop' });
       miningWorker.terminate();

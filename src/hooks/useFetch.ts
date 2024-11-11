@@ -23,7 +23,7 @@ const useFetch = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
             }
             const accessToken = await db.get("auth", "access_token");
             if (accessToken) {
-                const loadResp = await Api.get<LoadMinerResponse>("/load/miner");
+                const loadResp = await Api.get<LoadMinerResponse>("/miner/load");
 
                 //console.log("Load resp:")
                 //console.log(loadResp.data)

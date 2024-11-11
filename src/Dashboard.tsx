@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppSelector } from './state';
 import useFetch from './hooks/useFetch';
 import { useDispatch } from 'react-redux';
-import { setMinerBalance, setOfferedStorage } from './state/miner/actions';
+import { setMinerBalance, setMinerRewardRate, setOfferedStorage } from './state/miner/actions';
+import getAuthToken from './api/getAuthToken';
+import { Api, GenerateMinerChallengeResponse } from './api';
 
 declare global {
   interface Window {
@@ -16,8 +18,9 @@ declare global {
       setOfferedStorage: (storage: number) => Promise<boolean>;
       openOfferedStorage: () => Promise<void>;
       openExternal: (url: string) => Promise<void>;
-      startMining: () => Promise<void>;
+      startMining: (challenge: string) => Promise<void>;
       stopMining: () => Promise<void>;
+      on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => void;
     };
   }
 }
@@ -31,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [showExplosion, setShowExplosion] = useState<boolean>(false);
+  const [minerMessage, setMinerMessage] = useState('');
   const { fetchMinerData } = useFetch(db, dbReady);
 
   const dispatch = useDispatch();
@@ -38,6 +42,12 @@ const Dashboard: React.FC = () => {
 
   const { authenticated } = useAppSelector((state) => state.user);
   const { balance, rewardRate, offeredStorageBytes } = useAppSelector((state) => state.miner);
+
+
+  //function to stop mining:
+  const stopMining = async () => {
+    setIsMining(false);
+  }
 
   // Load data from IndexedDB when the database is ready
   useEffect(() => {
@@ -79,10 +89,26 @@ const Dashboard: React.FC = () => {
 
 
   useEffect(() => {
-    console.log("balance changed: ", balance)
-    console.log("rewardRate changed:", rewardRate) 
-    console.log("storage changed:", storage)
-  }, [balance, rewardRate])
+
+    let miningInterval: NodeJS.Timeout | undefined;
+    if (!isMining) {
+      // Clear any previous interval to avoid multiple intervals
+      clearInterval(miningInterval);
+    }
+    // Set a new interval to update balance based on reward rate
+    miningInterval = setInterval(() => {
+      if (!isMining) {
+        // Clear interval if mining is stopped
+        clearInterval(miningInterval);
+        return;
+      }
+      dispatch(setMinerBalance((balance + (parseFloat(rewardRate) / 3600)).toString()));
+    }, 1000); // Increment balance every second
+
+    // Cleanup interval on component unmount or when mining stops
+    return () => clearInterval(miningInterval);
+
+  }, [isMining, balance, rewardRate])
 
   // Save currentBalance to IndexedDB whenever it changes
   /*
@@ -104,28 +130,103 @@ const Dashboard: React.FC = () => {
     db.put('settings', isMining, 'isMining');
   }, [isMining, db]);
 
-  useEffect(() => {
-    let miningInterval: NodeJS.Timeout | undefined;
-    if (isMining) {
-      //get personal token
-      //TODO: send it to mining worker
+  const getChallenge = async () => {
 
-      window.electron.startMining();
-      miningInterval = setInterval(() => {
-        //get reward rate from mining worker
-        dispatch(setMinerBalance((balance + 0.0000000001).toString()));
-        //setCurrentBalance((prevBalance) => prevBalance + 0.0000000001);
-      }, 1000); // Increment balance every second
+    let challengeResponse = await Api.get<GenerateMinerChallengeResponse>("/miner/challenge").catch((err) => {
+      console.error("Error getting challenge: ", err);
+      return { data: "" };
+    })
+    const challengeRes = challengeResponse.data as GenerateMinerChallengeResponse;
+
+    return challengeRes;
+  }
+
+
+  useEffect(() => {
+
+    // Check if mining is active
+    if (isMining) {
+      // Get personal token and start mining if valid
+      getAuthToken(db, dbReady).then(async (authToken) => {
+        if (!authToken) {
+          alert("authToken is null");
+          return;
+        }
+
+        const challengeRes = await getChallenge();
+
+        if (!challengeRes.challenge) {
+          console.log("challenge is null");
+          stopMining();
+          return;
+        } else {
+          // Set reward rate
+          dispatch(setMinerRewardRate(challengeRes.rewardRate.toString()));
+
+          // Start mining and set interval for balance update
+          //wait for 1 second before starting mining
+          setTimeout(() => {
+            if (isMining)
+              window.electron.startMining(challengeRes.challenge);
+          }, 1000);
+
+        }
+      }).catch((err) => {
+        console.error("Error getting auth token: ", err);
+      });
     } else {
+      // Stop mining and clear interval if mining is inactive
+      stopMining();
       window.electron.stopMining();
-      clearInterval(miningInterval);
     }
 
-    // Cleanup interval on component unmount or when mining stops
-    return () => clearInterval(miningInterval);
-  }, [isMining]);
+  }, [isMining, db, dbReady]); // Include rewardRate to ensure balance updates if it changes
 
   useEffect(() => {
+    // Set up the IPC listener
+    const handleMiningComplete = (_event: Electron.IpcRendererEvent, message: string) => {
+      //console.log(message)
+      setMinerMessage(message);
+      console.log("Received mining complete message: " + message)
+      /*
+{nonce: 1152487, hash: 'd5a28b1cc688c282d45b737246a36fe4ad4074c7b4fc9a589d630c6ba6000000', message: 'Mining took 0.03 minutes'}
+      */
+      //send result to server
+      Api.post("/miner/challenge", { result: message }).then((res) => {
+
+        console.log("RESULT of mining:")
+        console.log(res)
+
+        // set reward rate
+        dispatch(setMinerRewardRate(res.data.rewardRate.toString()));
+        // set balance
+        dispatch(setMinerBalance((parseFloat(res.data.balance)).toString()));
+        //get next challenge
+        //wait for 1 second before starting mining
+        setTimeout(() => {
+          if (isMining)
+            window.electron.startMining(res.data.challenge);
+        }, 1000);
+      }).catch(async (err) => {
+        console.error("Error sending result to server: ", err);
+        // get next challenge
+        const challengeRes = await getChallenge();
+        dispatch(setMinerRewardRate(challengeRes.rewardRate.toString()));
+        //wait for 1 second before starting mining
+        setTimeout(() => {
+          if (isMining)
+            window.electron.startMining(challengeRes.challenge);
+        }, 1000);
+        // stop mining
+        //stopMining();
+      })
+      //get back the next challenge from the server
+      //start mining again
+    };
+
+    //ipcRenderer.on('mining-complete', handleMiningComplete);
+    window.electron.on('mining-complete', handleMiningComplete);
+
     // Fetch available storage on component mount
     const fetchAvailableStorage = async () => {
       const availableStorage = await window.electron.getAvailableStorage();
@@ -134,6 +235,10 @@ const Dashboard: React.FC = () => {
 
     fetchAvailableStorage();
   }, []);
+
+
+
+
 
   const handleMiningClick = () => {
     if (!isMining) {
@@ -201,6 +306,8 @@ const Dashboard: React.FC = () => {
 
       {/* Start/Stop Mining Button */}
       <div className="flex justify-center mb-6">
+        <p>Is mining: {isMining ? 'true' : 'false'}</p>
+        <p>reward rate: {rewardRate}</p>
         <button
           onClick={handleMiningClick}
           className={`relative overflow-hidden flex items-center justify-center ${isMining

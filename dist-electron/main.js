@@ -15997,20 +15997,38 @@ const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let mainWindow;
+let startTime = Date.now();
 let lastKnownNonce = 0;
+let lastKnownChallenge = "";
 var miningWorker;
-function startMiningWorker(startingNonce = 0) {
+function startMiningWorker(startingNonce = 0, challenge = "") {
   miningWorker = new Worker("./miningWorker.js");
-  miningWorker.postMessage({ command: "start", nonce: startingNonce });
+  miningWorker.postMessage({ command: "start", nonce: startingNonce, challenge });
   miningWorker.on("message", (message) => {
     if (message.nonce !== void 0) {
       lastKnownNonce = message.nonce;
+      lastKnownChallenge = message.challenge;
     } else {
       console.log("Message from worker:", message);
     }
     if (message.message && message.message.startsWith("Mining took")) {
       lastKnownNonce = 0;
-      miningWorker.terminate();
+      lastKnownChallenge = "";
+      console.log(message);
+      let currentTime = Date.now();
+      let timeMargin = 5e3;
+      if (currentTime - startTime >= 5e3 - timeMargin) {
+        mainWindow == null ? void 0 : mainWindow.webContents.send("mining-complete", message);
+        console.log("Mining cycle complete");
+        miningWorker.terminate();
+      } else {
+        console.log("Waiting for remaining time to pass");
+        setTimeout(() => {
+          console.log("Mining cycle reached and complete");
+          mainWindow == null ? void 0 : mainWindow.webContents.send("mining-complete", message);
+          miningWorker.terminate();
+        }, 36e5 - (currentTime - startTime));
+      }
     }
   });
   miningWorker.on("error", (err) => {
@@ -16030,7 +16048,7 @@ function logMemoryUsage() {
     if (miningWorker) {
       miningWorker.postMessage({ command: "stop" });
       miningWorker.terminate();
-      startMiningWorker(lastKnownNonce);
+      startMiningWorker(lastKnownNonce, lastKnownChallenge);
     }
   }
 }
@@ -16162,11 +16180,11 @@ function createWindow() {
   });
   ipcMain.handle(
     "start-mining",
-    async () => {
+    async (_, challenge) => {
       console.log("starting mining");
       if (!miningWorker || miningWorker.threadId === null || miningWorker.threadId === -1) {
         console.log("starging worker function");
-        startMiningWorker();
+        startMiningWorker(void 0, challenge = challenge);
       } else {
         console.log("sending start message");
         miningWorker.postMessage({ command: "start" });
@@ -16175,6 +16193,7 @@ function createWindow() {
   );
   ipcMain.handle("stop-mining", async () => {
     lastKnownNonce = 0;
+    lastKnownChallenge = "";
     if (miningWorker) {
       miningWorker.postMessage({ command: "stop" });
       miningWorker.terminate();

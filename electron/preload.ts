@@ -30,6 +30,6 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('alert-title', (_, title) => callback(title));
   },
   fetchData: () => ipcRenderer.invoke('fetch-data'),
-  startMining: () => ipcRenderer.invoke('start-mining'),
+  startMining: (challenge: string) => ipcRenderer.invoke('start-mining', challenge),
   stopMining: () => ipcRenderer.invoke('stop-mining'),
 })

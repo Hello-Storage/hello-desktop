@@ -4,6 +4,10 @@ import StorageDragBar from './components/storage/StorageDragBar';
 import { IndexedDBProvider } from './idb/IndexedDBContext';
 import { FiLoader } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppSelector } from './state';
+import useFetch from './hooks/useFetch';
+import { useDispatch } from 'react-redux';
+import { setMinerBalance, setOfferedStorage } from './state/miner/actions';
 
 declare global {
   interface Window {
@@ -22,12 +26,18 @@ const Dashboard: React.FC = () => {
   const { db, dbReady } = useIndexedDB();
 
   const [isMining, setIsMining] = useState<boolean>(false);
-  const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [storage, setStorage] = useState<number>(0);
   const [maxStorage, setMaxStorage] = useState<number>(100); // Default to 100 GB
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [showExplosion, setShowExplosion] = useState<boolean>(false);
+  const { fetchMinerData } = useFetch(db, dbReady);
+
+  const dispatch = useDispatch();
+
+
+  const { authenticated } = useAppSelector((state) => state.user);
+  const { balance, rewardRate, offeredStorageBytes } = useAppSelector((state) => state.miner);
 
   // Load data from IndexedDB when the database is ready
   useEffect(() => {
@@ -37,16 +47,24 @@ const Dashboard: React.FC = () => {
     }
 
     const loadData = async () => {
+      if (!authenticated) return;
       setIsLoading(true);
-      const savedBalance = await db.get('settings', 'currentBalance');
+
+
+
+
       const savedStorage = await db.get('settings', 'storage');
       const savedIsMining = await db.get('settings', 'isMining');
 
-      if (savedBalance !== undefined) {
-        setCurrentBalance(savedBalance);
-      }
+      // get miner data from backend
+      await fetchMinerData(db, dbReady);
+
+
+
       if (savedStorage !== undefined) {
         setStorage(savedStorage);
+      } else {
+        setStorage(offeredStorageBytes);
       }
 
       if (savedIsMining !== undefined) {
@@ -57,13 +75,22 @@ const Dashboard: React.FC = () => {
     };
 
     loadData();
-  }, [db]);
+  }, [db, dbReady, authenticated]);
+
+
+  useEffect(() => {
+    console.log("balance changed: ", balance)
+    console.log("rewardRate changed:", rewardRate) 
+    console.log("storage changed:", storage)
+  }, [balance, rewardRate])
 
   // Save currentBalance to IndexedDB whenever it changes
+  /*
   useEffect(() => {
     if (!db || currentBalance <= 0 || isLoading) return;
     db.put('settings', currentBalance, 'currentBalance');
   }, [currentBalance, db]);
+  */
 
   // Save storage to IndexedDB whenever it changes
   useEffect(() => {
@@ -80,10 +107,17 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     let miningInterval: NodeJS.Timeout | undefined;
     if (isMining) {
+      //get personal token
+      //TODO: send it to mining worker
+
+      window.electron.startMining();
       miningInterval = setInterval(() => {
-        setCurrentBalance((prevBalance) => prevBalance + 0.0000000001);
+        //get reward rate from mining worker
+        dispatch(setMinerBalance((balance + 0.0000000001).toString()));
+        //setCurrentBalance((prevBalance) => prevBalance + 0.0000000001);
       }, 1000); // Increment balance every second
     } else {
+      window.electron.stopMining();
       clearInterval(miningInterval);
     }
 
@@ -129,6 +163,7 @@ const Dashboard: React.FC = () => {
     setLoadingMessage('');
     setIsLoading(false);
     setStorage(b); // Update storage state
+    dispatch(setOfferedStorage(b));
   };
 
   return (
@@ -168,11 +203,10 @@ const Dashboard: React.FC = () => {
       <div className="flex justify-center mb-6">
         <button
           onClick={handleMiningClick}
-          className={`relative overflow-hidden flex items-center justify-center ${
-            isMining
-              ? 'bg-red-500 hover:bg-red-600'
-              : 'bg-green-500 hover:bg-green-600'
-          } text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-300`}
+          className={`relative overflow-hidden flex items-center justify-center ${isMining
+            ? 'bg-red-500 hover:bg-red-600'
+            : 'bg-green-500 hover:bg-green-600'
+            } text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-300`}
           disabled={isLoading}
         >
           {isMining ? 'STOP MINING' : 'START MINING'}
@@ -182,7 +216,7 @@ const Dashboard: React.FC = () => {
       {/* Current Balance */}
       <div className="flex justify-center mb-6">
         <p className="text-xl font-semibold">
-          Current Balance: {currentBalance.toFixed(10)} HELLO
+          Current Balance: {parseFloat(balance).toFixed(10)} HELLO
         </p>
       </div>
 

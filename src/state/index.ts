@@ -3,10 +3,12 @@ import type { TypedUseSelectorHook } from "react-redux";
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 
 import userReducer from "./user/reducer";
+import minerReducer from "./miner/reducer";
 import errorReducer from "../slices/errorSlice";
 
 const rootReducer = combineReducers({
   user: userReducer,
+  miner: minerReducer,
   error: errorReducer,
 });
 

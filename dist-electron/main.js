@@ -16003,9 +16003,10 @@ function startMiningWorker(startingNonce = 0) {
   miningWorker = new Worker("./miningWorker.js");
   miningWorker.postMessage({ command: "start", nonce: startingNonce });
   miningWorker.on("message", (message) => {
-    console.log("Message from worker:", message);
     if (message.nonce !== void 0) {
       lastKnownNonce = message.nonce;
+    } else {
+      console.log("Message from worker:", message);
     }
     if (message.message && message.message.startsWith("Mining took")) {
       lastKnownNonce = 0;
@@ -16019,19 +16020,11 @@ function startMiningWorker(startingNonce = 0) {
     console.log("Worker exited with code:", code);
   });
 }
-let maxMem = 0;
 function logMemoryUsage() {
   const used = process.memoryUsage();
   const usedMem = used.rss;
-  const usedMemMB = usedMem / 1024 / 1024;
-  const usedMemStr = usedMem.toFixed(2);
-  if (usedMem > maxMem) {
-    maxMem = usedMemMB;
-  }
   const freeMem = os.freemem();
   const usedMemPercentage = usedMem / freeMem * 100;
-  console.log(`Memory Usage: RSS=${usedMemStr} MB (${usedMemPercentage.toFixed(2)}% of free memory)
-MaxMem: ${maxMem} MB`);
   if (usedMemPercentage >= 10) {
     console.log("Memory usage exceeds 10% of available free memory. Restarting worker.");
     if (miningWorker) {
@@ -16182,8 +16175,10 @@ function createWindow() {
   );
   ipcMain.handle("stop-mining", async () => {
     lastKnownNonce = 0;
-    miningWorker.postMessage({ command: "stop" });
-    miningWorker.terminate();
+    if (miningWorker) {
+      miningWorker.postMessage({ command: "stop" });
+      miningWorker.terminate();
+    }
   });
   setTimeout(() => {
     mainWindow == null ? void 0 : mainWindow.webContents.send("alert-title", "Hello from Main Process!");

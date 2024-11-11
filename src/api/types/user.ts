@@ -14,6 +14,11 @@ export interface LoadUserResponse {
   walletPrivateKey?: string;
 }
 
+export interface LoadMinerResponse {
+  miner: any;
+  rewardRate: string;
+}
+
 export interface UserDetailResponse {
   storage_used: number;
   referral_storage: number;

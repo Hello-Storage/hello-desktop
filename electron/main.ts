@@ -43,22 +43,25 @@ let lastKnownNonce = 0;
 
 // Start the mining worker with an optional starting nonce
 var miningWorker: Worker;
-function startMiningWorker(startingNonce = 0) {
+function startMiningWorker(startingNonce = 0/*personalToken */) {
+  // get nonce from server and reward rate
   miningWorker = new Worker('./miningWorker.js');
 
   miningWorker.postMessage({ command: 'start', nonce: startingNonce });
 
   miningWorker.on('message', (message) => {
-    console.log('Message from worker:', message);
     if (message.nonce !== undefined) {
       // Update the last known nonce value
       lastKnownNonce = message.nonce;
+    } else {
+      console.log('Message from worker:', message);
     }
 
     if (message.message && message.message.startsWith('Mining took')) {
       // Mining completed, terminate the worker
       lastKnownNonce = 0
       miningWorker.terminate();
+      // send result to server
     }
   });
   miningWorker.on('error', (err) => {
@@ -78,7 +81,7 @@ function logMemoryUsage() {
   const used = process.memoryUsage();
   const usedMem = used.rss
   const usedMemMB = usedMem / 1024 / 1024
-  const usedMemStr = usedMem.toFixed(2)
+  //const usedMemStr = usedMem.toFixed(2)
 
   if (usedMem > maxMem) {
     maxMem = usedMemMB
@@ -89,7 +92,7 @@ function logMemoryUsage() {
 
   const usedMemPercentage = (usedMem / freeMem) * 100;
 
-  console.log(`Memory Usage: RSS=${usedMemStr} MB (${usedMemPercentage.toFixed(2)}% of free memory)\nMaxMem: ${maxMem} MB`);
+  //console.log(`Memory Usage: RSS=${usedMemStr} MB (${usedMemPercentage.toFixed(2)}% of free memory)\nMaxMem: ${maxMem} MB`);
 
   if (usedMemPercentage >= 10) {
     console.log('Memory usage exceeds 10% of available free memory. Restarting worker.');
@@ -286,19 +289,22 @@ function createWindow() {
     console.log("starting mining")
     if (!miningWorker || miningWorker.threadId === null || miningWorker.threadId === -1) {
       console.log("starging worker function")
+      //send personal token
       startMiningWorker();
     } else {
       console.log("sending start message")
-      miningWorker.postMessage({command: 'start'});
+      miningWorker.postMessage({ command: 'start' });
     }
   }
   );
 
   ipcMain.handle('stop-mining', async () => {
     lastKnownNonce = 0;
-    miningWorker.postMessage({command: 'stop'});
-    miningWorker.terminate();
-  });
+    if (miningWorker) {
+      miningWorker.postMessage({ command: 'stop' });
+      miningWorker.terminate();
+    }
+  })
 
 
   // Emit the event with the string after 5 seconds (as an example)

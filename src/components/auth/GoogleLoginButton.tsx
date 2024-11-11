@@ -27,7 +27,11 @@ export default function GoogleLoginButton() {
 
             const oauthResp = await Api.get("/oauth/google", {
                 params: Params,
+            }).catch((err) => {
+                console.error(err);
+                setLoading(false);
             });
+            if (!oauthResp) return;
             setAuthToken(db, dbReady, oauthResp.data.access_token);
             setAccountType(db, dbReady, AccountType.Google);
             load(db, dbReady);

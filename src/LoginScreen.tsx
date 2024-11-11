@@ -26,12 +26,6 @@ const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState("");
 
   const [onPresent] = useModal(<OTPModal db={db} dbReady={dbReady} email={email} />);
-
-  const handleGoogleLogin = () => {
-    // Logic for Google login
-  };
-
-
   function validateEmail(email: string) {
     const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
     return re.test(String(email).toLowerCase());

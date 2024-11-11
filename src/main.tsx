@@ -13,19 +13,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Provider store={state}>
       <GoogleOAuth>
         <ModalProvider>
-          <button
-            onClick={() => window.electron.startMining()}
-            className="text-black text-4xl font-bold select-none relative cursor-pointer rounded-b-lg pb-1"
-          >
-            Start Mining
-          </button>
-
-          <button
-            onClick={() => window.electron.stopMining()}
-            className="text-black text-4xl font-bold select-none relative cursor-pointer rounded-b-lg pb-1"
-          >
-            Stop Mining
-          </button>
           <App />
         </ModalProvider>
       </GoogleOAuth>

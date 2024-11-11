@@ -158,6 +158,10 @@ const useAuth = (db: IDBPDatabase<unknown> | null, dbReady: boolean) => {
                 state.dispatch(logoutUser());
                 setPersonalSignature(db, dbReady, undefined);
                 setAccountType(db, dbReady, undefined);
+
+                // remove absolutely all data from IndexedDB
+                await db.clear("auth");
+                await db.clear("settings");
                 // TODO: metamask disconnect
                 //sdk.disconnect();
             }
